@@ -9,7 +9,7 @@ Shows the name of the music in the top right corner for a few seconds whenever a
 ## Install
 
 1. Install the community's mod loader: the `Patch.rb` from [*Patch.rb (enable Type 1 mods)*](https://mgq.miraheze.org/wiki/Paradox_mods#Patch.rb_(enable_Type_1_mods)) on the MGQ wiki, in your `Patch` folder. If you already use other Patch folder mods, you have it.
-2. [Download `Now_Playing.rb`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/raw/main/Now_Playing/Now_Playing.rb) and put it into the `Patch` folder.
+2. [Download `Now_Playing.rb`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Now_Playing.rb) and put it into the `Patch` folder.
 
 To uninstall, delete `Patch\Now_Playing.rb`.
 
