@@ -14,3 +14,10 @@ To uninstall, delete `Patch\TimeStop_Music.rb`.
 ## Compatibility
 
 Tested on 3.06 with the English translation.
+
+Please note that this mod replaces the following methods:
+
+- `Audio.start_over_drive`
+- `Audio.end_over_drive`
+
+Any mod altering these will be incompatible.
