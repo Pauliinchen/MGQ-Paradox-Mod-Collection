@@ -4,6 +4,7 @@ Small mods for Monster Girl Quest! Paradox RPG, one folder each. They are Patch 
 
 | Mod | What it does | Download |
 |---|---|---|
+| [Map Display](Map_Display) | Shows the name of the map in the top left corner after each map change. | [Map_Display.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Map_Display.rb) |
 | [Now Playing](Now_Playing) | Shows the name of the music in the top right corner whenever a new track starts. | [Now_Playing.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Now_Playing.rb) |
 | [TimeStop Music](TimeStop_Music) | Keeps the battle music playing through time stop. | [TimeStop_Music.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/TimeStop_Music.rb) |
 
