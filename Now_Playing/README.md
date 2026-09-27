@@ -3,6 +3,7 @@
 Shows the name of the music in the top right corner for a few seconds whenever a new track starts. The names are the ones from the music room of Kagetsumugi's jukebox.
 
 - Slides in, stays for 3 seconds, then fades out.
+- After a map change it waits until the screen has faded in, so it slides in together with the map name of [Map Display](../Map_Display).
 - Shows up everywhere: on maps, in menus, in battles and on the title screen.
 - Tracks the music room doesn't list show nothing.
 

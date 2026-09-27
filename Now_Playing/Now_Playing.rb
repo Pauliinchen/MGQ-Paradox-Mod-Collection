@@ -2,6 +2,7 @@
 #  Now_Playing.rb
 #
 #  Changelog:
+#      Paulinchen  2026-09-27: Held the popup back while the screen is dark.
 #      Paulinchen  2026-09-26: Created
 #
 #----------------------------------------------------------------
@@ -101,8 +102,12 @@ module Now_Playing
     end
 
     # Moves the popup on by one frame. Called once per frame from the Graphics.update hook.
+    #
+    # A map transfer starts the new music while the screen is still black, so the popup waits for
+    # the screen to light up and slides in together with the map name.
     def self.update
       return unless @frame && @sprite && !@sprite.disposed?
+      return if @frame == 0 && Graphics.brightness < 255
 
       @frame += 1
       if @frame >= SLIDE_FRAMES + HOLD_FRAMES + FADE_FRAMES
