@@ -6,6 +6,7 @@ Small mods for Monster Girl Quest! Paradox RPG, one folder each. They are Patch 
 |---|---|---|
 | [Map Display](Map_Display) | Shows the name of the map in the top left corner after each map change. | [Map_Display.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Map_Display.rb) |
 | [Now Playing](Now_Playing) | Shows the name of the music in the top right corner whenever a new track starts. | [Now_Playing.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Now_Playing.rb) |
+| [Party Sheet](Party_Sheet) | Writes a page with every party member's picture, stats, equipment, abilities and trait at the press of F7, plus an image of the Frontline to share. | [Party_Sheet.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Party_Sheet.rb) |
 | [TimeStop Music](TimeStop_Music) | Keeps the battle music playing through time stop. | [TimeStop_Music.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/TimeStop_Music.rb) |
 
 To install one, download its `.rb` file and put it into the game's `Patch` folder. To uninstall it, delete that file.
@@ -16,4 +17,4 @@ To install one, download its `.rb` file and put it into the game's `Patch` folde
 
 ## Disclaimer
 
-This is an unofficial fan project. It is not affiliated with Torotoro Resistance, the creators of Monster Girl Quest, or the English translation team. It contains no game or translation files.
+This is an unofficial fan project. It is not affiliated with Torotoro Resistance, the creators of Monster Girl Quest, or the English translation team. It contains no game or translation files, apart from screenshots showing what a mod does.
