@@ -7,6 +7,7 @@ Shows what is said in a battle in boxes that slide out at the sides of the scree
 - Messages nobody says, such as "... appears!", show as a see-through strip at the top, below the skill name.
 - Each box stays for 1.5 to 5 seconds, depending on how long the line is, then fades out. Up to three stack on each side, the newest on top.
 - Messages with choices stay in the normal message window.
+- Once a battle is won or lost, its messages stay in the normal message window too, so victory screens such as Victory_Screen.rb wait for you as before.
 
 The [Discord Rich Presence](https://github.com/Pauliinchen/MGQ-Paradox-Discord-Rich-Presence) mod uses it in live friend battles, so neither player waits for the other to press a key.
 

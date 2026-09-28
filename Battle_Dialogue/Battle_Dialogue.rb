@@ -83,7 +83,17 @@ module Battle_Dialogue
   #
   # @return [Boolean]
   def self.active?
-    ENABLED && $game_party.in_battle ? true : false
+    ENABLED && $game_party.in_battle && !over? ? true : false
+  end
+
+  # Tells whether the battle is won or lost, whose messages stay in the message window.
+  #
+  # Victory screens such as Victory_Screen.rb wait for these messages to be read, so a box would
+  # skip their pages.
+  #
+  # @return [Boolean] Whether the victory or defeat is being shown.
+  def self.over?
+    $game_temp.in_victory_message || BattleManager.instance_variable_get(:@phase).nil?
   end
 
   # Marks a battler as the speaker of the lines the block shows, whose side decides the box's.
