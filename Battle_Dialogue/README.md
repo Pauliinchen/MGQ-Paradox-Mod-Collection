@@ -9,7 +9,7 @@ Shows what is said in a battle in boxes that slide out at the sides of the scree
 - Messages with choices stay in the normal message window.
 - Once a battle is won or lost, its messages stay in the normal message window too, so victory screens such as Victory_Screen.rb wait for you as before.
 
-The [Discord Rich Presence](https://github.com/Pauliinchen/MGQ-Paradox-Discord-Rich-Presence) mod uses it in live friend battles, so neither player waits for the other to press a key.
+The [Multiplayer](https://github.com/Pauliinchen/MGQ-Paradox-Multiplayer-Mod) mod uses it in live PvP battles, so neither player waits for the other to press a key.
 
 ## Install
 
