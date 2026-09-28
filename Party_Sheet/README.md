@@ -1,6 +1,6 @@
 # Party Sheet
 
-Press **F7** anywhere in the game to write `Party Sheet.html` into the game folder: a card for every party member, split into the Frontline and the Reserve, with play time, gold and location on top. Open it in any browser.
+Press **P** anywhere in the game to write `Party Sheet.html` into the game folder: a card for every party member, split into the Frontline and the Reserve, with play time, gold and location on top. Open it in any browser.
 
 ![A part of the sheet: four Frontline cards with their stats, equipment, abilities and trait, some lists unfolded and an item's description shown](preview.png)
 
@@ -26,7 +26,7 @@ The images are inside the page, so it can be moved or shared on its own. A few s
 
 ## Frontline image
 
-F7 also writes `Party Sheet.png`: the Frontline's cards side by side, without the folded lists. It fits Discord well, where images show right in the chat.
+P also writes `Party Sheet.png`: the Frontline's cards side by side, without the folded lists. It fits Discord well, where images show right in the chat.
 
 The image is taken by Microsoft Edge, or Google Chrome if Edge is missing, which runs in the background without a window. The game doesn't wait for it; the image appears a few seconds later.
 
@@ -35,7 +35,8 @@ The image is taken by Microsoft Edge, or Google Chrome if Edge is missing, which
 With the Mod Config Menu installed, the options are there, otherwise at the end of the game's Config menu:
 
 - **[Party Sheet] Output**: write the page and the image, only the page, or only the image.
-- **Write Party Sheet**: writes it right away, like F7.
+- **Write Party Sheet**: writes it right away, like the hotkey.
+- **[Party Sheet] Hotkey**: the key that writes the sheet anywhere in the game: **P** (default), another letter the game leaves free (O, I, U, K, L, M, N, J, H, G), Tab, Insert, Home, End, or **None** to write it only with the button. The F keys are left out, as the game, its plugins and other mods use them.
 - **[Party Sheet] Theme**: the colours of the page and the image.
   - **Dynamic** (default): white and gold if you chose Ilias, dark and purple if you chose Alice. Before you choose, it stays dark.
   - **Static**: always the same colours, the ones picked under **`-> Shown Theme`**: **Alice (Dark)** (default) or **Ilias (Light)**.
@@ -52,7 +53,6 @@ To uninstall, delete `Patch\Party_Sheet.rb`, and the `Party Sheet` files in the 
 These are constants at the top of `Party_Sheet.rb`. Open it in any text editor to change them.
 
 - `ENABLED`: turns the mod off without uninstalling it.
-- `KEY`: the key that writes the sheet, F7 by default.
 - `EMBED_IMAGES`: set to `false` for a much smaller page that loads its images from the game folder instead. It then only works while it stays in the game folder.
 - `PORTRAIT_QUALITY`: the WebP quality of the portraits, from 0 to 1, `0.85` by default. Set it to `nil` to keep the game's PNGs.
 

@@ -2,6 +2,7 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-09-28: Replaced the F7 key with a Hotkey option that picks among keys the game leaves free.
 #      Paulinchen  2026-09-27: Added a Theme option that makes the page white and gold for Ilias, dark and purple for Alice.
 #                            - Blocked scripts and outside requests in the page with a content security policy.
 #                            - Wrote the page indented, an element or CSS declaration per line.
@@ -9,16 +10,13 @@
 #
 #----------------------------------------------------------------
 
-# Writes Party Sheet.html next to Game.exe at the press of KEY or from the Mod Config Menu: every
+# Writes Party Sheet.html next to Game.exe at the press of a hotkey or from the Mod Config Menu: every
 # party member with the full picture of the Library, levels, stats, equipment, abilities, trait and
 # the jobs and races mastered. It can also take an image of the Frontline. It must never interrupt
 # the game, so every entry point rescues.
 module MGQ_PartySheet
   # Turns the sheet off without uninstalling it.
   ENABLED = true
-
-  # Key that writes the sheet, anywhere in the game.
-  KEY = :F7
 
   # Whether the page carries its images inside (true) or links them from the game folder (false).
   # Embedded, the page can be moved and shared on its own, at a few MB.
@@ -68,11 +66,11 @@ module MGQ_PartySheet
     log("could not write the party sheet: #{e.class}: #{e.message}")
   end
 
-  # Writes the sheet when KEY was pressed this frame. Called once per frame, after the input updated.
-  def self.check_key
-    write if Input.trigger?(KEY)
+  # Writes the sheet when the key of the Hotkey option went down. Called once per frame.
+  def self.check_hotkey
+    write if Keyboard.pressed?(Options.hotkey)
   rescue => e
-    log("key check failed: #{e.class}: #{e.message}")
+    log("hotkey check failed: #{e.class}: #{e.message}")
   end
 
   # Builds a part of the page, leaving it out when the game lacks what it reads.
@@ -127,14 +125,59 @@ module MGQ_PartySheet
   rescue
   end
 
+  # Reads keys from Windows, as the game's Input knows little more than its buttons and the F keys.
+  module Keyboard
+    # Set in a key's state while the key is down.
+    DOWN = 0x8000
+
+    # Reports whether a key went down since the last call for it, while the game's window is in front.
+    #
+    # Windows reports the key whichever window has the focus, so a press in another window is
+    # ignored.
+    #
+    # @param code [Integer] the key's Windows code, 0 for none
+    # @return [Boolean] whether the key went down
+    def self.pressed?(code)
+      return false if code <= 0
+
+      @down ||= {}
+      down = (api('user32', 'GetAsyncKeyState', 'i', 'i').call(code) & DOWN) != 0
+      pressed = down && !@down[code]
+      @down[code] = down
+      pressed && game_in_front?
+    end
+
+    # @return [Boolean] whether the window in front belongs to this game, true when Windows cannot tell
+    def self.game_in_front?
+      owner = [0].pack('L')
+      api('user32', 'GetWindowThreadProcessId', 'lp', 'l').call(api('user32', 'GetForegroundWindow', 'v', 'l').call, owner)
+      owner.unpack('L')[0] == api('kernel32', 'GetCurrentProcessId', 'v', 'l').call
+    rescue
+      true
+    end
+
+    # @param library [String] the Windows library
+    # @param name [String] the function
+    # @param arguments [String] its arguments, in Win32API notation
+    # @param result [String] its result, in Win32API notation
+    # @return [Win32API] the function, loaded once
+    def self.api(library, name, arguments, result)
+      @functions ||= {}
+      @functions[name] ||= Win32API.new(library, name, arguments, result)
+    end
+  end
+
   # The mod's entries in the Mod Config Menu when it is installed, in the game's Config menu
-  # otherwise: what to write, a button that writes it, and the page's colours.
+  # otherwise: what to write, a button and a hotkey that write it, and the page's colours.
   module Options
     # What the sheet writes: 0 the page and the image, 1 the page, 2 the image.
     OUTPUT = :mod_party_sheet_output
 
     # The button that writes the sheet.
     WRITE = :mod_party_sheet_write
+
+    # The key that writes the sheet anywhere in the game, by its Windows code, 0 for none.
+    HOTKEY = :mod_party_sheet_hotkey
 
     # Whether the colours follow the side chosen (0) or are always the ones of Shown Theme (1).
     THEME = :mod_party_sheet_theme
@@ -154,6 +197,14 @@ module MGQ_PartySheet
       1 => ["Page",           "Party Sheet.html with the whole party."],
       2 => ["Image",          "Party Sheet.png of the Frontline."],
     }
+
+    # Hotkey's values, Windows key codes, by the key's name. The first one is the default.
+    #
+    # The game takes A, D, Q, S, W, X, Z, Page Up and Page Down as buttons, and the game, its
+    # plugins or other mods take the F keys.
+    HOTKEYS = { 0x50 => "P", 0x4F => "O", 0x49 => "I", 0x55 => "U", 0x4B => "K", 0x4C => "L", 0x4D => "M",
+             0x4E => "N", 0x4A => "J", 0x48 => "H", 0x47 => "G", 0x09 => "Tab", 0x2D => "Insert",
+             0x24 => "Home", 0x23 => "End", 0 => "None" }
 
     # Theme's values by their name and help in the menu. The first one is the default.
     THEMES = {
@@ -178,7 +229,8 @@ module MGQ_PartySheet
 
       add(OUTPUT, "[Party Sheet] Output", "What the party sheet writes into the game folder.", OUTPUTS)
       @menu.insert(-2, :key => WRITE, :name => "     -> Write Party Sheet", :sub => false,
-                       :help => "Write the party sheet now. #{KEY} does the same anywhere in the game.")
+                       :help => "Write the party sheet now. The key picked under Hotkey does the same anywhere in the game.")
+      add(HOTKEY, "[Party Sheet] Hotkey", "The key that writes the party sheet anywhere in the game.", hotkey_values)
       @theme = add(THEME, "[Party Sheet] Theme", "The colours of the party sheet.", THEMES)
       @shown_theme = add(SHOWN_THEME, "     -> Shown Theme", "The colours of the party sheet while Theme is Static.", SHOWN_THEMES)
 
@@ -203,6 +255,13 @@ module MGQ_PartySheet
       values.each { |value, (label, text)| config::DATA_TEXT[key][value] = { :name => label, :help => text } }
       config::DEFAULT[key] = values.keys.first
       entry
+    end
+
+    # @return [Hash{Integer => Array(String, String)}] HOTKEYS by their name and help in the menu
+    def self.hotkey_values
+      HOTKEYS.each_with_object({}) do |(code, name), values|
+        values[code] = [name, code > 0 ? "Press #{name} anywhere in the game." : "Only Write Party Sheet writes it."]
+      end
     end
 
     # Puts Shown Theme into the menu, below Theme, while Theme is Static, and takes it out otherwise.
@@ -230,6 +289,11 @@ module MGQ_PartySheet
     def self.value(key)
       value = $game_system.conf[key] rescue nil
       value.nil? ? NWConst::Config::DEFAULT[key] : value
+    end
+
+    # @return [Integer] the Windows code of the key that writes the sheet, 0 for none
+    def self.hotkey
+      value(HOTKEY).to_i
     end
 
     # @return [Boolean] whether the sheet writes the page
@@ -1980,19 +2044,18 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
     MGQ_PartySheet.log("options FAILED: #{e.class}: #{e.message}")
   end
 
-  # Every scene updates the input in update_basic once per frame, so KEY triggers once per press.
-  # Graphics.update also runs in waits that leave the input alone, where one press would repeat.
+  # Every scene runs update_basic once per frame, in every menu and on the map.
   begin
     class Scene_Base
       alias mgq_party_sheet_update_basic update_basic
       def update_basic(*args)
         result = mgq_party_sheet_update_basic(*args)
-        MGQ_PartySheet.check_key
+        MGQ_PartySheet.check_hotkey
         result
       end
     end
   rescue => e
-    MGQ_PartySheet.log("key hook FAILED: #{e.class}: #{e.message}")
+    MGQ_PartySheet.log("hotkey hook FAILED: #{e.class}: #{e.message}")
   end
 
   # The config windows draw every option again after each change, so Shown Theme comes and goes
