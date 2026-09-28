@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-09-27: Blocked scripts and outside requests in the page with a content security policy.
+#      Paulinchen  2026-09-27: Added a Theme option that makes the page white and gold for Ilias, dark and purple for Alice.
+#                            - Blocked scripts and outside requests in the page with a content security policy.
 #                            - Wrote the page indented, an element or CSS declaration per line.
 #                            - Created
 #
@@ -127,13 +128,25 @@ module MGQ_PartySheet
   end
 
   # The mod's entries in the Mod Config Menu when it is installed, in the game's Config menu
-  # otherwise: what to write, and a button that writes it.
+  # otherwise: what to write, a button that writes it, and the page's colours.
   module Options
     # What the sheet writes: 0 the page and the image, 1 the page, 2 the image.
     OUTPUT = :mod_party_sheet_output
 
     # The button that writes the sheet.
     WRITE = :mod_party_sheet_write
+
+    # Whether the colours follow the side chosen (0) or are always the ones of Shown Theme (1).
+    THEME = :mod_party_sheet_theme
+
+    # Which colours the page has while Theme is Static: 0 dark and purple, 1 white and gold.
+    SHOWN_THEME = :mod_party_sheet_shown_theme
+
+    # Theme's value that keeps the colours of Shown Theme.
+    STATIC = 1
+
+    # Shown Theme's value for white and gold.
+    LIGHT = 1
 
     # Output's values by their name and help in the menu. The first one is the default.
     OUTPUTS = {
@@ -142,39 +155,101 @@ module MGQ_PartySheet
       2 => ["Image",          "Party Sheet.png of the Frontline."],
     }
 
-    # Adds the entries before the menu's last one, which returns.
+    # Theme's values by their name and help in the menu. The first one is the default.
+    THEMES = {
+      0 => ["Dynamic", "White and gold if you chose Ilias, dark and purple if you chose Alice or have not chosen yet."],
+      1 => ["Static",  "Always the colours Shown Theme picks."],
+    }
+
+    # Shown Theme's values by their name and help in the menu. The first one is the default.
+    SHOWN_THEMES = {
+      0 => ["Alice (Dark)",  "Always dark and purple."],
+      1 => ["Ilias (Light)", "Always white and gold."],
+    }
+
+    # Adds the entries before the menu's last one, which returns, and takes Shown Theme out while
+    # Theme is Dynamic. Its entry is kept, so arrange can put it back.
     #
     # The Mod Config Menu defines MOD_CONTENTS in 0_ModConfigMenu.rb, which the mod loader runs
     # before this script.
     def self.register
       config = NWConst::Config
-      menu = config.const_defined?(:MOD_CONTENTS) ? config::MOD_CONTENTS : config::CONTENTS
+      @menu = config.const_defined?(:MOD_CONTENTS) ? config::MOD_CONTENTS : config::CONTENTS
 
-      menu.insert(-2, :key => OUTPUT, :name => "[Party Sheet] Output", :sub => true,
-                      :help => "What the party sheet writes into the game folder.\r\n←/→ Toggle")
-      config::DATA[OUTPUT] = OUTPUTS.keys
-      config::DATA_TEXT[OUTPUT] = {}
-      OUTPUTS.each { |value, (name, help)| config::DATA_TEXT[OUTPUT][value] = { :name => name, :help => help } }
-      config::DEFAULT[OUTPUT] = OUTPUTS.keys.first
+      add(OUTPUT, "[Party Sheet] Output", "What the party sheet writes into the game folder.", OUTPUTS)
+      @menu.insert(-2, :key => WRITE, :name => "     -> Write Party Sheet", :sub => false,
+                       :help => "Write the party sheet now. #{KEY} does the same anywhere in the game.")
+      @theme = add(THEME, "[Party Sheet] Theme", "The colours of the party sheet.", THEMES)
+      @shown_theme = add(SHOWN_THEME, "     -> Shown Theme", "The colours of the party sheet while Theme is Static.", SHOWN_THEMES)
 
-      menu.insert(-2, :key => WRITE, :name => "     -> Write Party Sheet", :sub => false,
-                      :help => "Write the party sheet now. #{KEY} does the same anywhere in the game.")
+      arrange
     end
 
-    # @return [Integer] the Output option's value, its default until it was changed
-    def self.output
-      value = $game_system.conf[OUTPUT] rescue nil
-      value.nil? ? NWConst::Config::DEFAULT[OUTPUT] : value
+    # Adds an option before the menu's last entry.
+    #
+    # @param key [Symbol] the option, its key in $game_system.conf
+    # @param name [String] its name in the menu
+    # @param help [String] its help in the menu
+    # @param values [Hash{Integer => Array(String, String)}] its values by their name and help, the
+    #   first one being the default
+    # @return [Hash] its entry in the menu
+    def self.add(key, name, help, values)
+      config = NWConst::Config
+      entry = { :key => key, :name => name, :sub => true, :help => "#{help}\r\n←/→ Toggle" }
+
+      @menu.insert(-2, entry)
+      config::DATA[key] = values.keys
+      config::DATA_TEXT[key] = {}
+      values.each { |value, (label, text)| config::DATA_TEXT[key][value] = { :name => label, :help => text } }
+      config::DEFAULT[key] = values.keys.first
+      entry
+    end
+
+    # Puts Shown Theme into the menu, below Theme, while Theme is Static, and takes it out otherwise.
+    # The config windows call it before they draw, so the menu follows every change.
+    #
+    # @return [Boolean] whether the menu changed
+    def self.arrange
+      return false unless @shown_theme
+
+      listed = @menu.any? { |item| item.equal?(@shown_theme) }
+      return false if listed == static_theme?
+
+      if listed
+        @menu.reject! { |item| item.equal?(@shown_theme) }
+      else
+        @menu.insert(@menu.index { |item| item.equal?(@theme) } + 1, @shown_theme)
+      end
+      true
+    end
+
+    # Reads an option as the menu currently shows it.
+    #
+    # @param key [Symbol] the option
+    # @return [Integer] its value, its default until it was changed
+    def self.value(key)
+      value = $game_system.conf[key] rescue nil
+      value.nil? ? NWConst::Config::DEFAULT[key] : value
     end
 
     # @return [Boolean] whether the sheet writes the page
     def self.page?
-      output != 2
+      value(OUTPUT) != 2
     end
 
     # @return [Boolean] whether the sheet takes the image of the Frontline
     def self.image?
-      output != 1
+      value(OUTPUT) != 1
+    end
+
+    # @return [Boolean] whether the colours are always the ones of Shown Theme
+    def self.static_theme?
+      value(THEME) == STATIC
+    end
+
+    # @return [Boolean] whether the page is white and gold rather than dark and purple
+    def self.light?
+      static_theme? ? value(SHOWN_THEME) == LIGHT : Party.side == :ilias
     end
   end
 
@@ -509,6 +584,22 @@ module MGQ_PartySheet
       $game_map.display_name.to_s
     rescue
       ""
+    end
+
+    # Side chosen, by the name in the editor of the switch that records the choice.
+    SIDES = { "Ilias Chosen" => :ilias, "Alice Chosen" => :alice }
+
+    # Reads the switches by their names, so no id is hard-coded.
+    #
+    # @return [Symbol, nil] the side this playthrough chose, :ilias or :alice, nil before the choice
+    def self.side
+      switch = SIDES.keys.find do |name|
+        id = $data_system.switches.index(name)
+        id && $game_switches[id]
+      end
+      SIDES[switch]
+    rescue
+      nil
     end
   end
 
@@ -1337,11 +1428,29 @@ if ($Frontline) {
              [:certain_evasion, "Auto-Hit Evasion Rate"], [:cnt, "Counter Rate"],
              [:magical_counter, "Magic Counter Rate"], [:certain_counter, "Auto-Hit Counter Rate"]]
 
-    # Style of the page. Paths inside are relative to the game folder, where the page lies.
+    # Colours of the page for Alice: dark and purple.
+    DARK = <<-'CSS'
+:root{color-scheme:dark;--bg:#120e17;--card:#1c1624;--tile:#241c2e;--line:#34293f;--text:#efe9f6;--muted:#a597b5;--gold:#e9c46a;--rose:#e58fb3;
+--glow:#2a1d3a;--halo:#3b2a52;--shade:rgba(18,14,23,.94);--name-shadow:0 2px 6px #000;--chip:#2b2137;--chip-text:#cdbfe0;
+--trait:linear-gradient(135deg,#2a1f35,#221a2b);--trait-text:#d8cde6;--tip:rgba(13,10,18,.85);--shadow:rgba(0,0,0,.35);--tip-shadow:rgba(0,0,0,.5);
+--good:#86d4a3;--bad:#ef8f8f;--reflect:#8ec5ff;--absorb:#c79bff}
+    CSS
+
+    # Colours of the page for Ilias: white and gold. The ability colours are darkened, as the
+    # yellow ones vanish on white.
+    LIGHT = <<-'CSS'
+:root{color-scheme:light;--bg:#f7f2e6;--card:#fffdf8;--tile:#f4ecda;--line:#e2d3b1;--text:#2b2418;--muted:#75674c;--gold:#94700f;--rose:#a8566f;
+--glow:#fff3cf;--halo:#fbecc0;--shade:rgba(255,253,248,.94);--name-shadow:0 1px 4px #fff;--chip:#efe4cb;--chip-text:#5a4d33;
+--trait:linear-gradient(135deg,#fbf2da,#f6ead0);--trait-text:#4d4330;--tip:rgba(255,253,248,.92);--shadow:rgba(120,95,40,.15);--tip-shadow:rgba(120,95,40,.25);
+--good:#2d8049;--bad:#c0392b;--reflect:#2a6db5;--absorb:#7c47bf}
+.abilities summary b{color:color-mix(in srgb,var(--c) 65%,#000)}
+    CSS
+
+    # Style of the page, in the colours of DARK or LIGHT. Paths inside are relative to the game
+    # folder, where the page lies.
     STYLE = <<-'CSS'
-:root{--bg:#120e17;--card:#1c1624;--tile:#241c2e;--line:#34293f;--text:#efe9f6;--muted:#a597b5;--gold:#e9c46a;--rose:#e58fb3}
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(1200px 600px at 50% -200px,#2a1d3a,transparent),var(--bg);color:var(--text);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+body{margin:0;background:radial-gradient(1200px 600px at 50% -200px,var(--glow),transparent),var(--bg);color:var(--text);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
 .page{max-width:1900px;margin:0 auto;padding:32px 16px 48px}
 .top h1{margin:0;font:600 34px/1.1 Georgia,"Times New Roman",serif;color:var(--gold);letter-spacing:.02em}
 .top p{margin:4px 0 18px;color:var(--muted)}
@@ -1351,13 +1460,13 @@ body{margin:0;background:radial-gradient(1200px 600px at 50% -200px,#2a1d3a,tran
 .group{margin:36px 0 14px;padding-bottom:6px;border-bottom:1px solid var(--line);font:600 20px Georgia,serif;color:var(--gold)}
 .group small{margin-left:8px;font:400 14px "Segoe UI",sans-serif;color:var(--muted)}
 .party{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-.portrait{position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:13px 13px 0 0;background:radial-gradient(circle at 50% 65%,#3b2a52,var(--card) 70%);border-bottom:1px solid var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px var(--shadow)}
+.portrait{position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:13px 13px 0 0;background:radial-gradient(circle at 50% 65%,var(--halo),var(--card) 70%);border-bottom:1px solid var(--line)}
 .portrait img{display:block;width:100%;height:100%;object-fit:contain}
 .face{width:96px;height:96px;transform:scale(2);background-repeat:no-repeat}
 .initial{font:600 120px Georgia,serif;color:var(--line)}
-.title{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:baseline;gap:10px;padding:32px 16px 10px;background:linear-gradient(transparent,rgba(18,14,23,.94))}
-.title h3{margin:0;font:600 24px Georgia,serif;text-shadow:0 2px 6px #000}
+.title{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:baseline;gap:10px;padding:32px 16px 10px;background:linear-gradient(transparent,var(--shade))}
+.title h3{margin:0;font:600 24px Georgia,serif;text-shadow:var(--name-shadow)}
 .title span{margin-left:auto;color:var(--gold);font-weight:600;white-space:nowrap}
 .body{padding:12px 16px 16px}
 .classes{display:grid;gap:6px}
@@ -1388,7 +1497,7 @@ h4{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.1em
 .sprite{background-image:url("Graphics/System/IconSet.png");background-repeat:no-repeat}
 .empty{color:var(--muted);font-style:italic}
 .equips details{grid-column:3;margin:0 0 4px;padding:2px 8px}
-.equips .chips>span{font-size:11px;background:#2b2137;color:#cdbfe0;border:0;border-radius:4px;padding:1px 6px}
+.equips .chips>span{font-size:11px;background:var(--chip);color:var(--chip-text);border:0;border-radius:4px;padding:1px 6px}
 .chips .sealed{text-decoration:line-through;color:var(--muted)}
 .chips i{font-style:normal;color:var(--gold)}
 .resists{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;margin:8px 0 2px;font-size:12px}
@@ -1397,14 +1506,14 @@ h4{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.1em
 .resists dt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .resists dd{margin:0;font-variant-numeric:tabular-nums}
 .resists .normal{opacity:.5}
-.resists .good dd{color:#86d4a3}
-.resists .bad dd{color:#ef8f8f}
+.resists .good dd{color:var(--good)}
+.resists .bad dd{color:var(--bad)}
 .resists .null dd{color:var(--gold)}
-.resists .reflect dd{color:#8ec5ff}
-.resists .absorb dd{color:#c79bff}
-.trait{padding:8px 12px;border-left:3px solid var(--rose);border-radius:8px;background:linear-gradient(135deg,#2a1f35,#221a2b)}
+.resists .reflect dd{color:var(--reflect)}
+.resists .absorb dd{color:var(--absorb)}
+.trait{padding:8px 12px;border-left:3px solid var(--rose);border-radius:8px;background:var(--trait)}
 .trait b{color:var(--rose)}
-.trait p{margin:4px 0 0;font-size:13px;color:#d8cde6}
+.trait p{margin:4px 0 0;font-size:13px;color:var(--trait-text)}
 .abilities{display:grid;gap:6px}
 .abilities details{margin:0;border-left:3px solid var(--c)}
 .abilities summary{font-size:12px}
@@ -1412,14 +1521,14 @@ h4{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.1em
 .abilities summary span{float:right;font-variant-numeric:tabular-nums}
 .ability .chips{margin-top:4px}
 .tip{position:relative;cursor:help}
-.tipbox{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:10;width:max-content;max-width:300px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(13,10,18,.85);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);color:var(--text);font-size:12px;line-height:1.45;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none}
+.tipbox{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:10;width:max-content;max-width:300px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--tip);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);color:var(--text);font-size:12px;line-height:1.45;box-shadow:0 8px 24px var(--tip-shadow);pointer-events:none}
 .tip:hover>.tipbox{display:block}
-.ability .chips>span{display:inline-flex;align-items:center;gap:4px;padding:0 8px 0 2px;border:0;border-radius:4px;background:#2b2137}
+.ability .chips>span{display:inline-flex;align-items:center;gap:4px;padding:0 8px 0 2px;border:0;border-radius:4px;background:var(--chip)}
 details{margin-top:8px;background:var(--tile);border-radius:8px;padding:6px 10px}
 summary{cursor:pointer;font-size:13px;color:var(--muted)}
 summary b{margin-left:6px;color:var(--gold)}
 .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
-details.category{margin-top:6px;padding:4px 8px;background:#2b2137}
+details.category{margin-top:6px;padding:4px 8px;background:var(--chip)}
 details.category summary{font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 .category .chips{margin-top:6px}
 .chips>span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px}
@@ -1457,7 +1566,7 @@ html{background:var(--bg)}
     # else.
     SHOT = <<-'CSS'
 body{margin:0;background:var(--bg)}
-.shot{width:fit-content;padding:24px;background:radial-gradient(900px 400px at 50% -150px,#2a1d3a,transparent),var(--bg)}
+.shot{width:fit-content;padding:24px;background:radial-gradient(900px 400px at 50% -150px,var(--glow),transparent),var(--bg)}
     CSS
 
     # Width of a card in the image, in pixels.
@@ -1485,7 +1594,7 @@ body{margin:0;background:var(--bg)}
               '</div></body></html>'].join("\n")
 
       policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"#{POLICY}\">"
-      page = [head("#{STYLE}@media print{#{PRINT}#{COMPACT}}#{icon_style}", policy), body].join("\n")
+      page = [head("#{STYLE}#{palette}@media print{#{PRINT}#{COMPACT}}#{icon_style}", policy), body].join("\n")
 
       pretty = MGQ_PartySheet.safely("indentation") { Pretty.html(page) }
       pretty.empty? ? page : pretty
@@ -1504,7 +1613,17 @@ body{margin:0;background:var(--bg)}
              "<div class=\"party\" style=\"#{columns}\">#{cards(actors)}</div></section>"
 
       base_tag = base ? "<base href=\"#{Text.html(base)}\">" : ""
-      [head("#{STYLE}#{COMPACT}#{SHOT}#{icon_style}", base_tag), '<body>', shot, SIZE_SCRIPT, '</body></html>'].join("\n")
+      [head("#{STYLE}#{palette}#{COMPACT}#{SHOT}#{icon_style}", base_tag), '<body>', shot, SIZE_SCRIPT, '</body></html>'].join("\n")
+    end
+
+    # Follows STYLE, whose rules the palette's own ones override.
+    #
+    # @return [String] the colours the Theme option picks, DARK when they cannot be told
+    def self.palette
+      Options.light? ? LIGHT : DARK
+    rescue => e
+      MGQ_PartySheet.log("theme left dark: #{e.class}: #{e.message}")
+      DARK
     end
 
     # @param style [String] the page's CSS
@@ -1708,7 +1827,7 @@ body{margin:0;background:var(--bg)}
       folds = Party.abilities(actor).map do |id, name, skills, ap|
         chips = skills.map { |skill| tip("#{icon(skill.icon_index)}#{Text.game(skill.name)}", skill.description) }
         points = ap ? "<span>#{ap[0]} / #{ap[1]} AP</span>" : ""
-        "<details class=\"ability\" style=\"--c:#{ABILITY_COLORS.fetch(id, '#a597b5')}\">" \
+        "<details class=\"ability\" style=\"--c:#{ABILITY_COLORS.fetch(id, 'var(--muted)')}\">" \
           "<summary><b>#{Text.game(name)}</b>#{points}</summary><div class=\"chips\">#{chips.join}</div></details>"
       end
       folds.empty? ? "" : "<div class=\"abilities\"><h4>Abilities</h4>#{folds.join}</div>"
@@ -1874,6 +1993,26 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
     end
   rescue => e
     MGQ_PartySheet.log("key hook FAILED: #{e.class}: #{e.message}")
+  end
+
+  # The config windows draw every option again after each change, so Shown Theme comes and goes
+  # right away. The game's window sizes its contents to the options once, the Mod Config Menu's its
+  # width, so both are measured again when the options change.
+  begin
+    [:Window_Config, :Window_ModConfig].select { |name| Object.const_defined?(name) }.each do |name|
+      Object.const_get(name).class_eval do
+        alias_method :mgq_party_sheet_refresh, :refresh
+        define_method(:refresh) do
+          if (MGQ_PartySheet::Options.arrange rescue false)
+            calculate_and_resize if respond_to?(:calculate_and_resize)
+            create_contents
+          end
+          mgq_party_sheet_refresh
+        end
+      end
+    end
+  rescue => e
+    MGQ_PartySheet.log("config window hooks FAILED: #{e.class}: #{e.message}")
   end
 
   # The config windows call the handler of an entry's key when it is chosen, and stay active.

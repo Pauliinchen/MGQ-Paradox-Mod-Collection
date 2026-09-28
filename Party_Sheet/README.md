@@ -36,6 +36,9 @@ With the Mod Config Menu installed, the options are there, otherwise at the end 
 
 - **[Party Sheet] Output**: write the page and the image, only the page, or only the image.
 - **Write Party Sheet**: writes it right away, like F7.
+- **[Party Sheet] Theme**: the colours of the page and the image.
+  - **Dynamic** (default): white and gold if you chose Ilias, dark and purple if you chose Alice. Before you choose, it stays dark.
+  - **Static**: always the same colours, the ones picked under **`-> Shown Theme`**: **Alice (Dark)** (default) or **Ilias (Light)**.
 
 ## Install
 
@@ -61,7 +64,8 @@ Tested on 3.06 with the English translation.
 
 The pictures need the game's graphics as loose files in its `Graphics` folder. With the graphics still packed in `Game.rgss3a`, the cards show the character's face instead.
 
-The mod replaces no game methods. It runs after these, leaving what they do unchanged:
+The mod replaces no game methods. It runs alongside these, leaving what they do unchanged:
 
 - `Scene_Base#update_basic`
 - `Scene_Config#start`
+- `Window_Config#refresh` and the Mod Config Menu's `Window_ModConfig#refresh`, to show Shown Theme only while Theme is Static
