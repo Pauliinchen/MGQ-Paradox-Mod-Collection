@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-09-27: Created
+#      Paulinchen  2026-09-27: Wrote the page indented, an element or CSS declaration per line.
+#                            - Created
 #
 #----------------------------------------------------------------
 
@@ -1037,9 +1038,10 @@ module MGQ_PartySheet
                      "document.body.setAttribute('data-converted','1');});</script>"
 
     # Converts the page: the browser loads the converting copy and dumps it once the portraits are
-    # WebP, which then replaces the page. Takes the image: the browser measures the Frontline, which
-    # its page reports on its body, then takes a screenshot at exactly that size, as a screenshot
-    # holds the browser's window and no more.
+    # WebP, which then replaces the page. The dump joins the html and head tags and leaves blank
+    # lines where CONVERT_SCRIPT was, which the script mends. Takes the image: the browser measures
+    # the Frontline, which its page reports on its body, then takes a screenshot at exactly that
+    # size, as a screenshot holds the browser's window and no more.
     SCRIPT = <<-'PS1'
 param([string]$Browser, [string]$UserData, [string]$Log, [string]$Convert, [string]$Page, [string]$Frontline, [string]$Image)
 $common = @('--headless', '--disable-gpu', '--no-first-run', '--hide-scrollbars', "--user-data-dir=$UserData")
@@ -1050,6 +1052,8 @@ if ($Convert) {
     $html = [IO.File]::ReadAllText("$Convert.out", [Text.Encoding]::UTF8)
     if ($html -notmatch 'data-converted="1"') { throw 'the browser did not convert the portraits' }
     $html = $html.Replace(' data-converted="1"', '')
+    $html = $html -replace '<html([^>]*)><head>', ('<html$1>' + "`n  <head>")
+    $html = $html -replace '\s*</body>\s*</html>\s*$', "`n  </body>`n</html>`n"
     if (-not $html.StartsWith('<!DOCTYPE')) { $html = "<!DOCTYPE html>`n$html" }
     [IO.File]::WriteAllText("$Page.tmp", $html, (New-Object Text.UTF8Encoding $false))
     Move-Item -LiteralPath "$Page.tmp" -Destination $Page -Force
@@ -1154,6 +1158,159 @@ if ($Frontline) {
     # @return [Win32API] ShellExecuteA, which starts a program without waiting for it
     def self.shell_execute
       @shell_execute ||= Win32API.new('shell32', 'ShellExecuteA', 'lppppl', 'l')
+    end
+  end
+
+  # Writes the page like hand-written code: an element per line, indented by how deep it sits, and
+  # its CSS a declaration per line.
+  #
+  # Only whitespace between elements changes, which the browser ignores next to blocks and between
+  # grid and flex items, so the page looks the same.
+  module Pretty
+    # One step of indentation.
+    INDENT = "  "
+
+    # Elements that take lines of their own. The others stay on their neighbours' line, where the
+    # line break would show as a space.
+    BLOCKS = %w(doctype html head body meta base title style header footer section article div ul li dl dt dd
+                details summary h1 h2 h3 h4 p)
+
+    # Elements without content or closing tag.
+    VOIDS = %w(doctype meta base img br)
+
+    # A CSS declaration, whose parentheses may hold semicolons, like a data URI's.
+    DECLARATION = /(?:[^;(]+|\([^)]*\))+/
+
+    # @param html [String] the page as built
+    # @return [String] the page indented
+    def self.html(html)
+      lines = []
+      add_nodes(tree(html), 0, lines)
+      lines.join("\n") + "\n"
+    end
+
+    # Reads the page into nested elements. It relies on the page being well-formed, which it is
+    # as Page escapes every game text.
+    #
+    # @param html [String] the page
+    # @return [Array<Array(String, String, Array), String>] the top elements and text, each element
+    #   being its name, its opening tag and its content
+    def self.tree(html)
+      root = [nil, nil, []]
+      open = [root]
+      html.scan(/<[^>]*>|[^<]+/) do |token|
+        if token.start_with?("</")
+          open.pop if open.size > 1
+        elsif token.start_with?("<")
+          node = [token[/\A<!?(\w+)/, 1].downcase, token, []]
+          open.last[2] << node
+          open << node unless VOIDS.include?(node[0])
+        else
+          open.last[2] << token
+        end
+      end
+      root[2]
+    end
+
+    # Adds a line per block, and one per run of inline elements and text between blocks.
+    #
+    # @param nodes [Array<Array, String>] elements and text, in order
+    # @param depth [Integer] how deep they sit
+    # @param lines [Array<String>] the lines so far
+    def self.add_nodes(nodes, depth, lines)
+      run = []
+      (nodes + [nil]).each do |node|
+        if node.nil? || block?(node)
+          text = run.map { |part| inline(part) }.join.strip
+          lines << INDENT * depth + text unless text.empty?
+          run = []
+          add_element(node, depth, lines) if node
+        else
+          run << node
+        end
+      end
+    end
+
+    # Adds a block: on one line when it holds only inline content, its content indented between
+    # its tags otherwise.
+    #
+    # @param node [Array(String, String, Array)] the element
+    # @param depth [Integer] how deep it sits
+    # @param lines [Array<String>] the lines so far
+    def self.add_element(node, depth, lines)
+      name, tag, children = node
+      pad = INDENT * depth
+
+      if VOIDS.include?(name)
+        lines << pad + tag
+      elsif name == "style"
+        lines << pad + tag
+        add_css(children.join, depth + 1, lines)
+        lines << "#{pad}</style>"
+      elsif children.any? { |child| block?(child) }
+        lines << pad + tag
+        add_nodes(children, depth + 1, lines)
+        lines << "#{pad}</#{name}>"
+      else
+        lines << pad + inline(node)
+      end
+    end
+
+    # @param css [String] a style sheet, or the rules inside an at-rule like @media
+    # @param depth [Integer] how deep the rules sit
+    # @param lines [Array<String>] the lines so far
+    def self.add_css(css, depth, lines)
+      pad = INDENT * depth
+      rules(css).each do |prelude, body|
+        lines << "#{pad}#{prelude} {"
+        if body.include?("{")
+          add_css(body, depth + 1, lines)
+        else
+          body.scan(DECLARATION) do |declaration|
+            property, value = declaration.split(":", 2)
+            lines << "#{pad}#{INDENT}#{property.strip}: #{value.strip};" if value
+          end
+        end
+        lines << "#{pad}}"
+      end
+    end
+
+    # @param css [String] a style sheet, or the rules inside an at-rule
+    # @return [Array<Array(String, String)>] each rule's selector or at-rule, and what its braces hold
+    def self.rules(css)
+      rules = []
+      depth = 0
+      from = 0
+      opened = 0
+      css.scan(/[{}]/) do |brace|
+        at = $~.begin(0)
+        if brace == "{"
+          opened = at if depth == 0
+          depth += 1
+        else
+          depth -= 1
+          next unless depth == 0
+
+          rules << [css[from...opened].strip, css[opened + 1...at]]
+          from = at + 1
+        end
+      end
+      rules
+    end
+
+    # @param node [Array, String] an element or text
+    # @return [Boolean] whether it takes lines of its own
+    def self.block?(node)
+      node.is_a?(Array) && BLOCKS.include?(node[0])
+    end
+
+    # @param node [Array, String] an element or text
+    # @return [String] its HTML as it was built
+    def self.inline(node)
+      return node if node.is_a?(String)
+
+      name, tag, children = node
+      VOIDS.include?(name) ? tag : "#{tag}#{children.map { |child| inline(child) }.join}</#{name}>"
     end
   end
 
@@ -1317,7 +1474,10 @@ body{margin:0;background:var(--bg)}
               "<footer>Written by Party_Sheet.rb on #{Time.now.strftime('%Y-%m-%d %H:%M')}</footer>",
               '</div></body></html>'].join("\n")
 
-      [head("#{STYLE}@media print{#{PRINT}#{COMPACT}}#{icon_style}"), body].join("\n")
+      page = [head("#{STYLE}@media print{#{PRINT}#{COMPACT}}#{icon_style}"), body].join("\n")
+
+      pretty = MGQ_PartySheet.safely("indentation") { Pretty.html(page) }
+      pretty.empty? ? page : pretty
     end
 
     # Builds the page the image is taken of: the header over the Frontline in a single row.
