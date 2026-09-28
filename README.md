@@ -16,7 +16,7 @@ To install one, download its `.rb` file and put it into the game's `Patch` folde
 ## More mods
 
 - [Discord Rich Presence](https://github.com/Pauliinchen/MGQ-Paradox-Discord-Rich-Presence): shows what you're doing in the game on your Discord profile.
-- [Multiplayer](https://github.com/Pauliinchen/MGQ-Paradox-Multiplayer-Mod): lets you play together with a friend over a direct connection, so far in live PvP battles in which each of you commands your own Frontline.
+- [Multiplayer](https://github.com/Pauliinchen/MGQ-Paradox-Multiplayer-Mod): lets you play the game together with a friend.
 
 ## Disclaimer
 
