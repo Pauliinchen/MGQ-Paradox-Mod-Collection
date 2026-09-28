@@ -4,6 +4,7 @@ Small mods for Monster Girl Quest! Paradox RPG, one folder each. They are Patch 
 
 | Mod | What it does | Download |
 |---|---|---|
+| [Battle Dialogue](Battle_Dialogue) | Shows what is said in battle in boxes at the sides of the screen instead of the message window, so the battle never stops for a key press. | [Battle_Dialogue.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Battle_Dialogue.rb) |
 | [Map Display](Map_Display) | Shows the name of the map in the top left corner after each map change. | [Map_Display.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Map_Display.rb) |
 | [Now Playing](Now_Playing) | Shows the name of the music in the top right corner whenever a new track starts. | [Now_Playing.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Now_Playing.rb) |
 | [Party Sheet](Party_Sheet) | Writes a page with every party member's picture, stats, equipment, abilities and trait at the press of F7, plus an image of the Frontline to share. | [Party_Sheet.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Party_Sheet.rb) |
