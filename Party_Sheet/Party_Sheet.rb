@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-09-27: Wrote the page indented, an element or CSS declaration per line.
+#      Paulinchen  2026-09-27: Blocked scripts and outside requests in the page with a content security policy.
+#                            - Wrote the page indented, an element or CSS declaration per line.
 #                            - Created
 #
 #----------------------------------------------------------------
@@ -1027,14 +1028,15 @@ module MGQ_PartySheet
     SCRIPT_FILE = "Browser.ps1"
 
     # Replaces each portrait with its WebP, once the page has loaded, unless the WebP comes out
-    # larger. The script then takes itself out and marks the body, so the page the browser dumps
-    # is the page without it.
+    # larger. The script then takes itself out, puts back the page's policy and marks the body, so
+    # the page the browser dumps is the page without it.
     CONVERT_SCRIPT = "<script id=\"convert\">window.addEventListener('load',function(){" \
                      "[].forEach.call(document.querySelectorAll('.portrait img'),function(img){try{" \
                      "var canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;" \
                      "canvas.getContext('2d').drawImage(img,0,0);var webp=canvas.toDataURL('image/webp',%s);" \
                      "if(webp.indexOf('data:image/webp')===0&&webp.length<img.src.length)img.src=webp;}catch(e){}});" \
                      "var script=document.getElementById('convert');script.parentNode.removeChild(script);" \
+                     "document.querySelector('meta[http-equiv]').setAttribute('content',\"%s\");" \
                      "document.body.setAttribute('data-converted','1');});</script>"
 
     # Converts the page: the browser loads the converting copy and dumps it once the portraits are
@@ -1095,10 +1097,14 @@ if ($Frontline) {
       MGQ_PartySheet.log("could not start PowerShell: error #{result}") if result <= 32
     end
 
+    # The page's policy forbids scripts, so the copy allows inline ones until CONVERT_SCRIPT puts
+    # the policy back.
+    #
     # @param page [String] the page
     # @return [String] the page with CONVERT_SCRIPT at the end of its body
     def self.converting(page)
-      page.sub("</body>", "#{format(CONVERT_SCRIPT, PORTRAIT_QUALITY)}</body>")
+      script = format(CONVERT_SCRIPT, PORTRAIT_QUALITY, Page::POLICY)
+      page.sub(Page::POLICY, "#{Page::POLICY}; script-src 'unsafe-inline'").sub("</body>", "#{script}</body>")
     end
 
     # @param convert [Boolean] whether to convert the page's portraits
@@ -1316,6 +1322,10 @@ if ($Frontline) {
 
   # The HTML of the page.
   module Page
+    # Lets the page show its own styles and images and nothing else: no script runs and nothing
+    # loads from the internet, whatever the page holds.
+    POLICY = "default-src 'none'; style-src 'unsafe-inline'; img-src data:#{EMBED_IMAGES ? '' : ' file:'}; " \
+             "base-uri 'none'; form-action 'none'"
     # Stats shown as tiles, by the method that reads them and their name on the status screen.
     STATS = [[:mhp, "Max HP"], [:mmp, "Max MP"], [:atk, "Attack"], [:def, "Defense"],
              [:mat, "Magic"], [:mdf, "Willpower"], [:agi, "Agility"], [:luk, "Dexterity"]]
@@ -1474,13 +1484,15 @@ body{margin:0;background:var(--bg)}
               "<footer>Written by Party_Sheet.rb on #{Time.now.strftime('%Y-%m-%d %H:%M')}</footer>",
               '</div></body></html>'].join("\n")
 
-      page = [head("#{STYLE}@media print{#{PRINT}#{COMPACT}}#{icon_style}"), body].join("\n")
+      policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"#{POLICY}\">"
+      page = [head("#{STYLE}@media print{#{PRINT}#{COMPACT}}#{icon_style}", policy), body].join("\n")
 
       pretty = MGQ_PartySheet.safely("indentation") { Pretty.html(page) }
       pretty.empty? ? page : pretty
     end
 
-    # Builds the page the image is taken of: the header over the Frontline in a single row.
+    # Builds the page the image is taken of: the header over the Frontline in a single row. It
+    # runs SIZE_SCRIPT and is never shared, so it carries no POLICY.
     #
     # @param base [String, nil] the address linked images are relative to, nil when they are embedded
     # @return [String] the image's page
@@ -1491,16 +1503,17 @@ body{margin:0;background:var(--bg)}
       shot = "<section class=\"shot\">#{MGQ_PartySheet.safely('header') { header }}#{heading('Frontline', actors.size)}" \
              "<div class=\"party\" style=\"#{columns}\">#{cards(actors)}</div></section>"
 
-      [head("#{STYLE}#{COMPACT}#{SHOT}#{icon_style}", base), '<body>', shot, SIZE_SCRIPT, '</body></html>'].join("\n")
+      base_tag = base ? "<base href=\"#{Text.html(base)}\">" : ""
+      [head("#{STYLE}#{COMPACT}#{SHOT}#{icon_style}", base_tag), '<body>', shot, SIZE_SCRIPT, '</body></html>'].join("\n")
     end
 
     # @param style [String] the page's CSS
-    # @param base [String, nil] the address relative links start from, nil for the page's own folder
+    # @param extra [String] a tag the head carries besides the usual ones, "" for none
     # @return [String] the page up to its body
-    def self.head(style, base = nil)
+    def self.head(style, extra = "")
       ['<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+       extra,
        '<meta name="viewport" content="width=device-width,initial-scale=1">',
-       base ? "<base href=\"#{Text.html(base)}\">" : "",
        "<title>Party Sheet</title><style>#{style}</style></head>"].join("\n")
     end
 
