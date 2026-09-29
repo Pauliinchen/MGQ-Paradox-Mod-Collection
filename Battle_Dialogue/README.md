@@ -24,7 +24,7 @@ Timing, sizes, positions and colors are constants at the top of `Battle_Dialogue
 
 ## Compatibility
 
-Tested on 3.06 with the English translation.
+Tested on 3.06, with and without the English translation.
 
 This mod wraps the following methods and calls the original from them:
 
