@@ -2,6 +2,7 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-09-29: Ignored the hotkey while another mod takes typed text
 #      Paulinchen  2026-09-28: Replaced the F7 key with a Hotkey option that picks among keys the game leaves free.
 #      Paulinchen  2026-09-27: Added a Theme option that makes the page white and gold for Ilias, dark and purple for Alice.
 #                            - Blocked scripts and outside requests in the page with a content security policy.
@@ -130,10 +131,12 @@ module MGQ_PartySheet
     # Set in a key's state while the key is down.
     DOWN = 0x8000
 
-    # Reports whether a key went down since the last call for it, while the game's window is in front.
+    # Reports whether a key went down since the last call for it, while the game's window is in
+    # front and no mod takes typed text.
     #
     # Windows reports the key whichever window has the focus, so a press in another window is
-    # ignored.
+    # ignored. A mod that takes typed text, such as a chat, sets $mgq_text_input meanwhile, so a
+    # typed letter writes no sheet.
     #
     # @param code [Integer] the key's Windows code, 0 for none
     # @return [Boolean] whether the key went down
@@ -144,7 +147,7 @@ module MGQ_PartySheet
       down = (api('user32', 'GetAsyncKeyState', 'i', 'i').call(code) & DOWN) != 0
       pressed = down && !@down[code]
       @down[code] = down
-      pressed && game_in_front?
+      pressed && !$mgq_text_input && game_in_front?
     end
 
     # @return [Boolean] whether the window in front belongs to this game, true when Windows cannot tell

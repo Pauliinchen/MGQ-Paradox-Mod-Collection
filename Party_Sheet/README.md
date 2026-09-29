@@ -36,7 +36,7 @@ With the Mod Config Menu installed, the options are there, otherwise at the end 
 
 - **[Party Sheet] Output**: write the page and the image, only the page, or only the image.
 - **Write Party Sheet**: writes it right away, like the hotkey.
-- **[Party Sheet] Hotkey**: the key that writes the sheet anywhere in the game: **P** (default), another letter the game leaves free (O, I, U, K, L, M, N, J, H, G), Tab, Insert, Home, End, or **None** to write it only with the button. The F keys are left out, as the game, its plugins and other mods use them.
+- **[Party Sheet] Hotkey**: the key that writes the sheet anywhere in the game: **P** (default), another letter the game leaves free (O, I, U, K, L, M, N, J, H, G), Tab, Insert, Home, End, or **None** to write it only with the button. The F keys are left out, as the game, its plugins and other mods use them. While another mod takes typed text, such as a chat, the hotkey does nothing.
 - **[Party Sheet] Theme**: the colours of the page and the image.
   - **Dynamic** (default): white and gold if you chose Ilias, dark and purple if you chose Alice. Before you choose, it stays dark.
   - **Static**: always the same colours, the ones picked under **`-> Shown Theme`**: **Alice (Dark)** (default) or **Ilias (Light)**.
