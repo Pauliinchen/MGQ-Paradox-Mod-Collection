@@ -2,6 +2,7 @@
 #  Battle_Dialogue.rb
 #
 #  Changelog:
+#      Paulinchen  2026-09-29: Read the untranslated game's speaker lines and wrapped text without spaces
 #      Paulinchen  2026-09-28: Created
 #
 #----------------------------------------------------------------
@@ -76,6 +77,9 @@ module Battle_Dialogue
   # A speaker's name box code of the message system, "\n<Name>".
   SPEAKER_CODE = /\\n<([^>]*)>/
 
+  # The untranslated game's speaker line, the name in brackets opening a message: "【Name】".
+  SPEAKER_LINE = /\A【([^】]*)】\s*/
+
   # A summon's line starts with its name alone on the first line, "Sylph:".
   SUMMON_NAME = /\A([^:\\]{1,30}):\s*\z/
 
@@ -129,12 +133,16 @@ module Battle_Dialogue
   # @param face_index [Integer] the face in the file
   # @param lines [Array<String>] the message's lines
   def self.show(face_name, face_index, lines)
-    lines = lines.map(&:to_s)
+    # The untranslated game adds a speaker's line and what they say as one line with a break.
+    lines = lines.map { |line| line.to_s.split("\n") }.flatten
     name = nil
 
     if (first = lines.first) && first =~ SPEAKER_CODE
       name = $1
       lines[0] = first.sub(SPEAKER_CODE, "")
+    elsif first && first =~ SPEAKER_LINE
+      name = $1
+      lines[0] = first.sub(SPEAKER_LINE, "")
     elsif first && first =~ SUMMON_NAME
       name = $1
       lines.shift
@@ -369,7 +377,8 @@ class Window_BattleDialogue < Window_Base
     line.gsub(/\\[A-Za-z]+(\[[^\]]*\])?/, "").gsub(/\\./, "").strip
   end
 
-  # Breaks a text into lines that fit the box.
+  # Breaks a text into lines that fit the box, between words, and inside a word too wide for a
+  # line of its own, such as Japanese text, which has no spaces.
   #
   # @param text [String] the text
   # @return [Array<String>] the lines
@@ -380,10 +389,16 @@ class Window_BattleDialogue < Window_Base
     lines = [""]
     text.split(" ").each do |word|
       candidate = lines.last.empty? ? word : "#{lines.last} #{word}"
-      if measure.text_size(candidate).width <= room || lines.last.empty?
+      if measure.text_size(candidate).width <= room
         lines[-1] = candidate
-      else
+      elsif measure.text_size(word).width <= room
         lines << word
+      else
+        lines << "" unless lines.last.empty?
+        word.each_char do |character|
+          lines << "" if measure.text_size(lines.last + character).width > room && !lines.last.empty?
+          lines[-1] += character
+        end
       end
     end
     lines.reject(&:empty?)
