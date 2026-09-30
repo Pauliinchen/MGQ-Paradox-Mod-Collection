@@ -16,7 +16,7 @@ To install one, download its `.rb` file and put it into the game's `Patch` folde
 ## More mods
 
 - [Discord Rich Presence](https://github.com/Pauliinchen/MGQ-Paradox-Discord-Rich-Presence): shows what you're doing in the game on your Discord profile.
-- [Multiplayer](https://github.com/Pauliinchen/MGQ-Paradox-Multiplayer-Mod): lets you play the game together with a friend.
+- [Monster Girl Quest! Online](https://github.com/Pauliinchen/MGQ-Online): lets you play the game together with friends.
 
 ## Disclaimer
 

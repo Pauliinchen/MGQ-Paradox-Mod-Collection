@@ -9,7 +9,7 @@ Shows what is said in a battle in boxes that slide out at the sides of the scree
 - Messages with choices stay in the normal message window.
 - Once a battle is won or lost, its messages stay in the normal message window too, so victory screens such as Victory_Screen.rb wait for you as before.
 
-It works together with the [Multiplayer](https://github.com/Pauliinchen/MGQ-Paradox-Multiplayer-Mod) mod.
+It works together with [Monster Girl Quest! Online](https://github.com/Pauliinchen/MGQ-Online).
 
 ## Install
 
