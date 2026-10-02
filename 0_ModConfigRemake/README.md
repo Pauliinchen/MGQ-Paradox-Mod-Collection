@@ -7,7 +7,7 @@ A menu for the options of your other mods, which replaces the Mod Config Menu. M
 - With newer versions of the English translation, whose options screen has tabs, the menu is the **Mods** tab. The original Mod Config Menu no longer opens there.
 - With older versions, the **Mod Config Menu** entry in the options opens it.
 - Left and right change an option, Confirm moves it to its next value or presses a button.
-- A key binding shows its key. Confirm it, then press the new key; Esc keeps the old one. Keys the game uses itself (Enter, Space, Esc, the arrows, Z, X, Shift, Ctrl, A, S, D, Q, W, Page Up, Page Down, F1, F2, F5 to F9 and F12) and keys another option has already are refused.
+- A key binding shows its key. Confirm it, then press the new key; Esc keeps the old one. Keys the game uses itself (Enter, Space, Esc, Z, X, Shift, Ctrl, A, S, D, Q, W, Page Up, Page Down, the arrows, Num 0, 2, 4, 6 and 8, F1, F2, F5 to F9 and F12; see [Keys the menu refuses](#keys-the-menu-refuses)) and keys another option has already are refused.
 - Options and buttons a mod greys out cannot be used until it allows them again.
 
 ## Install
@@ -35,11 +35,73 @@ Add your options the way the Mod Config Menu expects them: insert an entry befor
 | `:keybind` | `true` for a key binding: its value is a key's Windows code, such as `0x54` for T, which the menu shows by its name and replaces with the next key the player presses. It needs no `DATA`. Leave `:sub` out. |
 | `:value` | For a key binding only: a proc that reads its key, in place of `$game_system.conf`, which the game keeps in each save. With it, the menu stores nothing itself: keep the key from `:on_change`, such as in a file of your mod, so it holds in every save. |
 
-Key bindings came with 1.3.0. Older versions of this menu and the Mod Config Menu show them as buttons that do nothing, so add one only while `ModConfigRemake::Keys` is defined, and keep your default key otherwise. `ModConfigRemake::Keys.name(code)` names a key as the menu does.
-
 `Scene_Config#refresh_mod_config` draws the options again, as in the Mod Config Menu; call it when one of your options changes how others show.
 
 The menu's window shows one mod's options at a time, so in `Window_ModConfig` an index counts that mod's rows, not the entries of `MOD_CONTENTS`: use `entry(index)` or `key(index)` to find a row's entry. An error in your `:on_change` proc or a button's handler leaves the menu running.
+
+### A key binding
+
+Key bindings came with 1.3.0. Older versions of this menu and the Mod Config Menu show them as buttons that do nothing, so add one only while `ModConfigRemake::Keys` is defined, and keep your default key otherwise. `ModConfigRemake::Keys.name(code)` names a key as the menu does.
+
+```ruby
+module NWConst::Config
+  # Only Mod Config Remake 1.3.0 or later knows key bindings; older menus keep the default key.
+  if defined?(ModConfigRemake::Keys)
+    MOD_CONTENTS.insert(-2, {
+      :key     => :mod_my_mod_hotkey,
+      :name    => "[My Mod] Hotkey",
+      :help    => "The key that opens My Mod's window.",
+      :keybind => true,
+    })
+  end
+
+  # M, a key the game leaves free.
+  DEFAULT[:mod_my_mod_hotkey] = 0x4D
+end
+
+module MyMod
+  # Windows' function that tells whether a key is down.
+  KEY_STATE = Win32API.new('user32', 'GetAsyncKeyState', 'i', 'i')
+
+  # Reads the key the player bound, the default until they bind another.
+  def self.hotkey
+    ($game_system.conf[:mod_my_mod_hotkey] rescue nil) || NWConst::Config::DEFAULT[:mod_my_mod_hotkey]
+  end
+
+  # Reports whether the key went down since the last call. Call it once per frame.
+  def self.hotkey_pressed?
+    down = (KEY_STATE.call(hotkey) & 0x8000) != 0
+    pressed = down && !@down
+    @down = down
+    pressed
+  end
+end
+```
+
+- **The value** is the key's Windows code. The menu shows its name and adds "Confirm, then press the new key." to your help, so don't write that yourself.
+- **The default** comes from `DEFAULT`, as for any option. Set it even when the key binding isn't added, so older menus keep it. Pick a key the game leaves free: the menu refuses the keys below and keys another option already has when a player binds one, but it doesn't check your default.
+- **Reading the key** is up to your mod; the menu only stores its code. `GetAsyncKeyState` reports a key whichever window is in front, so check that the game is in front if that matters.
+- **One key for every save:** the game keeps `$game_system.conf` in each save, so a key bound here holds only in the save it was bound in. To keep it in every save, store it yourself: add `:value => proc { MyMod.hotkey }` and `:on_change => proc { |code| MyMod.store_hotkey(code) }`, and read and write the key in a file of your mod.
+- **Esc** keeps the old key and doesn't call `:on_change`. `:enable` greys a key binding out like any other option. Key bindings take keyboard keys only, not gamepad buttons.
+
+#### Keys the menu refuses
+
+The game uses these itself, as RGSS lays out the keyboard by default. A player who changed the keys in the game's F1 settings still gets this list.
+
+| Keys | Windows codes | What the game does with them |
+|---|---|---|
+| Enter, Space, Z | `0x0D`, `0x20`, `0x5A` | Confirm |
+| Esc, X, Num 0 | `0x1B`, `0x58`, `0x60` | Cancel; Esc also keeps the old key while the menu waits for one |
+| Left Shift, Right Shift | `0xA0`, `0xA1` | Dash |
+| A, S, D | `0x41`, `0x53`, `0x44` | The X, Y and Z buttons |
+| Q, W, Page Up, Page Down | `0x51`, `0x57`, `0x21`, `0x22` | The L and R buttons |
+| Left, Up, Right, Down | `0x25` to `0x28` | Move |
+| Num 2, Num 4, Num 6, Num 8 | `0x62`, `0x64`, `0x66`, `0x68` | Move |
+| Left Ctrl, Right Ctrl | `0xA2`, `0xA3` | Skip messages |
+| F1, F2, F12 | `0x70`, `0x71`, `0x7B` | RGSS: the key settings, the frame rate, reset |
+| F5 to F9 | `0x74` to `0x78` | The game's own keys, such as F8, which hides the message window |
+
+A binding never takes the mouse buttons, the Windows keys (they leave the game), Shift, Ctrl and Alt without a side (Windows reports the left or right one), or media, browser and input method keys. These keys work: letters, digits, the other F keys up to F24, the other number pad keys, Tab, Backspace, Caps Lock, Pause, Insert, Delete, Home, End, Print Screen, Menu, Num Lock, Scroll Lock, Left Alt, Right Alt, and the keys with punctuation, which show the character your keyboard prints on them.
 
 ## Compatibility
 
