@@ -2,6 +2,7 @@
 #  Battle_Dialogue.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-02: Showed an enemy's answers to Talk and other event lines at the enemy side
 #      Paulinchen  2026-09-29: Read the untranslated game's speaker lines and wrapped text without spaces
 #      Paulinchen  2026-09-28: Created
 #
@@ -152,11 +153,38 @@ module Battle_Dialogue
     return if lines.empty? && name.nil?
 
     said = name || !face_name.to_s.empty?
-    side = !said ? :top : (@speaker && $game_troop.members.include?(@speaker) ? :right : :left)
+    side = !said ? :top : (@speaker ? side_of_battler(@speaker) : side_of_speaker(name, face_name.to_s))
     boxes = boxes_at(side)
     boxes.shift.dispose while boxes.size >= (side == :top ? MAX_STRIPS : MAX_BOXES)
     boxes << Window_BattleDialogue.new(said ? face_name.to_s : "", face_index.to_i, name, lines, side)
     arrange
+  end
+
+  # @param battler [Game_Battler] the battler who speaks
+  # @return [Symbol] :right for an enemy, :left for the player's team
+  def self.side_of_battler(battler)
+    $game_troop.members.include?(battler) ? :right : :left
+  end
+
+  # Tells the side of a line no battler is marked for, such as an enemy's answer in a Talk event or
+  # a line of a battle's story event.
+  #
+  # Talk events often name the enemy differently from its battler, so anyone not in the party counts
+  # as the enemy side, and an enemy's name wins over a companion of the same kind.
+  #
+  # @param name [String, nil] the speaker's name, which may end in a companion's "(Affection:...)"
+  # @param face_name [String] the face file, empty for none
+  # @return [Symbol] :left for a party member, :right otherwise
+  def self.side_of_speaker(name, face_name)
+    if name
+      name = name.sub(/\s*\([^)]*\)\s*\z/, "").strip
+      return :right if $game_troop.members.any? { |enemy| enemy.original_name == name }
+
+      friend = $game_party.members.any? { |actor| actor.name == name }
+    else
+      friend = $game_party.members.any? { |actor| actor.face_name == face_name }
+    end
+    friend ? :left : :right
   end
 
   # Moves the boxes on by one frame. Called once per frame by the battle.

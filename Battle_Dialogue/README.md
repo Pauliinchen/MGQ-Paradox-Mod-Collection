@@ -4,6 +4,7 @@ Shows what is said in a battle in boxes that slide out at the sides of the scree
 
 - Lines of your party slide out at the left with a green bar, lines of the enemy side at the right with a red bar, each with the speaker's face and name. The box fades out towards the middle of the screen.
 - A summon speaks on the side of whoever summoned it.
+- Lines of the game's events, such as an enemy's answers when you use Talk, show at the right unless a member of your party says them.
 - Messages nobody says, such as "... appears!", show as a see-through strip at the top, below the skill name.
 - Each box stays for 1.5 to 5 seconds, depending on how long the line is, then fades out. Up to three stack on each side, the newest on top.
 - Messages with choices stay in the normal message window.
