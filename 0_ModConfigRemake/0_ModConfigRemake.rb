@@ -3,6 +3,7 @@
 #
 #  Changelog:
 #      Paulinchen  2026-10-02: Added key bindings, options that take the next key pressed
+#                            - Added refresh_mod_config, which EXP Overlord calls after its options change
 #      Paulinchen  2026-09-28: Created
 #
 #----------------------------------------------------------------
@@ -811,6 +812,15 @@ class Scene_Config
     @mod_config_list_window.z = 200
     @mod_config_list_window.set_handler(:ok, method(:enter_mod_options))
     @mod_config_list_window.set_handler(:cancel, method(:end_mod_config))
+  end
+
+  # Draws the options of the mod shown anew, with their help. Mods made for the Mod Config Menu, such
+  # as EXP Overlord, call it after one of their options changed others.
+  def refresh_mod_config
+    return unless @mod_config_window
+
+    @mod_config_window.refresh
+    @mod_config_window.call_update_help
   end
 
   # Opens the menu of the mods' options below the help of the options screen, over its list.

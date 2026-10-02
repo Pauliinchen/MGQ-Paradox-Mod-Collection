@@ -37,6 +37,8 @@ Add your options the way the Mod Config Menu expects them: insert an entry befor
 
 Key bindings came with 1.3.0. Older versions of this menu and the Mod Config Menu show them as buttons that do nothing, so add one only while `ModConfigRemake::Keys` is defined, and keep your default key otherwise. `ModConfigRemake::Keys.name(code)` names a key as the menu does.
 
+`Scene_Config#refresh_mod_config` draws the options again, as in the Mod Config Menu; call it when one of your options changes how others show.
+
 The menu's window shows one mod's options at a time, so in `Window_ModConfig` an index counts that mod's rows, not the entries of `MOD_CONTENTS`: use `entry(index)` or `key(index)` to find a row's entry. An error in your `:on_change` proc or a button's handler leaves the menu running.
 
 ## Compatibility
@@ -57,6 +59,7 @@ It defines the following anew, replacing those of `0_ModConfigMenu.rb` when that
 - `Window_ModConfig`, the whole class
 - `Scene_Config#create_mod_config_window`
 - `Scene_Config#start_mod_config`
+- `Scene_Config#refresh_mod_config`
 - `Scene_Config#end_mod_config`
 
 Mods that hook these methods of `0_ModConfigMenu.rb` or keep its window class get this mod's instead.
