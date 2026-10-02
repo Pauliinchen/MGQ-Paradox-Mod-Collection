@@ -7,6 +7,7 @@ A menu for the options of your other mods, which replaces the Mod Config Menu. M
 - With newer versions of the English translation, whose options screen has tabs, the menu is the **Mods** tab. The original Mod Config Menu no longer opens there.
 - With older versions, the **Mod Config Menu** entry in the options opens it.
 - Left and right change an option, Confirm moves it to its next value or presses a button.
+- A key binding shows its key. Confirm it, then press the new key; Esc keeps the old one. Keys the game uses itself (Enter, Space, Esc, the arrows, Z, X, Shift, Ctrl, A, S, D, Q, W, Page Up, Page Down, F1, F2, F5 to F9 and F12) and keys another option has already are refused.
 - Options and buttons a mod greys out cannot be used until it allows them again.
 
 ## Install
@@ -31,6 +32,10 @@ Add your options the way the Mod Config Menu expects them: insert an entry befor
 | `:values` | Its values, an array or a proc, in place of `DATA`. |
 | `:enable` | A proc; while it returns false, the option is greyed out and cannot be changed. |
 | `:on_change` | A proc called with the new value after each change. |
+| `:keybind` | `true` for a key binding: its value is a key's Windows code, such as `0x54` for T, which the menu shows by its name and replaces with the next key the player presses. It needs no `DATA`. Leave `:sub` out. |
+| `:value` | For a key binding only: a proc that reads its key, in place of `$game_system.conf`, which the game keeps in each save. With it, the menu stores nothing itself: keep the key from `:on_change`, such as in a file of your mod, so it holds in every save. |
+
+Key bindings came with 1.3.0. Older versions of this menu and the Mod Config Menu show them as buttons that do nothing, so add one only while `ModConfigRemake::Keys` is defined, and keep your default key otherwise. `ModConfigRemake::Keys.name(code)` names a key as the menu does.
 
 The menu's window shows one mod's options at a time, so in `Window_ModConfig` an index counts that mod's rows, not the entries of `MOD_CONTENTS`: use `entry(index)` or `key(index)` to find a row's entry. An error in your `:on_change` proc or a button's handler leaves the menu running.
 

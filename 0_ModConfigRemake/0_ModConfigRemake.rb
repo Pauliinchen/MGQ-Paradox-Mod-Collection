@@ -2,6 +2,7 @@
 #  0_ModConfigRemake.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-02: Added key bindings, options that take the next key pressed
 #      Paulinchen  2026-09-28: Created
 #
 #----------------------------------------------------------------
@@ -27,6 +28,9 @@ module ModConfigRemake
 
   # The start of an option's name that sits under the option above it, "   Option" or "-> Option".
   INDENTED = /\A(\s|->)/
+
+  # The arrow of an indented option's name, which a message about the option leaves out.
+  INDENTED_MARK = /\A\s*->\s*/
 
   # Where the menu starts on the options screen without tabs, below its help.
   TOP = 120
@@ -70,11 +74,55 @@ module ModConfigRemake
     nil
   end
 
+  # Tells whether an option binds a key: its value is a key's Windows code, which the next key
+  # pressed replaces.
+  #
+  # @param entry [Hash] The option's entry.
+  # @return [Boolean] Whether it binds a key.
+  def self.key_binding?(entry)
+    entry[:keybind] ? true : false
+  end
+
+  # Reads a key binding's current value, from its :value proc when it has one.
+  #
+  # Only key bindings read :value, so an option of another mod with a key of that name stays as it is.
+  #
+  # @param entry [Hash] The key binding's entry.
+  # @return [Object] Its value.
+  def self.entry_value(entry)
+    entry[:value].respond_to?(:call) ? entry[:value].call : value_of(entry[:key])
+  rescue
+    nil
+  end
+
+  # Finds the option of any mod that a key is bound to already.
+  #
+  # @param code [Integer] The key's Windows code.
+  # @param except [Hash] The option being bound, which may keep its own key.
+  # @return [Hash, nil] The option's entry, nil when no other option has the key.
+  def self.key_owner(code, except)
+    NWConst::Config::MOD_CONTENTS.find { |entry| !entry.equal?(except) && key_binding?(entry) && entry_value(entry).to_i == code }
+  end
+
+  # Names an option for a message: its name without "[Mod Name]", followed by the mod in brackets.
+  #
+  # @param entry [Hash] The option's entry.
+  # @return [String] The name, such as "Chat (Monster Girl Quest! Online)".
+  def self.option_name(entry)
+    name = text(entry[:name])
+    mod = name[MOD_NAME, 1]
+    short = name.sub(MOD_NAME, "").sub(INDENTED_MARK, "").strip
+    mod ? "#{short} (#{mod})" : short
+  end
+
   # Writes an option's value as the menu shows it.
   #
   # @param entry [Hash] The option's entry.
-  # @return [String] The name DATA_TEXT gives the value, else the value itself.
+  # @return [String] The key's name for a key binding, else the name DATA_TEXT gives the value, else
+  #   the value itself.
   def self.value_text(entry)
+    return Keys.name(entry_value(entry).to_i) if key_binding?(entry)
+
     value = value_of(entry[:key])
     texts = NWConst::Config::DATA_TEXT[entry[:key]]
     named = texts[value] if texts
@@ -102,7 +150,9 @@ module ModConfigRemake
   # @return [String] The help.
   def self.help_text(entry)
     help = text(entry[:help])
-    if entry[:sub]
+    if key_binding?(entry)
+      help += "\r\nConfirm, then press the new key."
+    elsif entry[:sub]
       texts = NWConst::Config::DATA_TEXT[entry[:key]]
       named = texts[value_of(entry[:key])] if texts
       extra = named ? text(named[:help]) : ""
@@ -203,6 +253,122 @@ module ModConfigRemake
       end
     end
   end
+
+  # The keyboard as key binding options read it, from Windows: the keys' names, and the next key
+  # pressed.
+  module Keys
+    # Set in a key state while the key is down.
+    DOWN = 0x8000
+
+    # Windows' code of Escape, which leaves a binding unchanged.
+    ESCAPE = 0x1B
+
+    # The keys a binding takes: the keyboard's, without the mouse buttons, the Windows keys, which
+    # leave the game, and Shift, Ctrl and Alt without a side, which Windows reports with the sided ones.
+    BINDABLE = [0x08, 0x09, 0x0D, 0x13, 0x14, 0x1B, 0x5D, 0x90, 0x91, 0xE2] +
+               (0x20..0x2E).to_a + (0x30..0x39).to_a + (0x41..0x5A).to_a + (0x60..0x6F).to_a +
+               (0x70..0x87).to_a + (0xA0..0xA5).to_a + (0xBA..0xC0).to_a + (0xDB..0xDF).to_a
+
+    # The keys the game uses itself: its buttons on the keyboard as RGSS sets them (Enter, Space, Z,
+    # Esc, X, Num 0, Shift, A, S, D, Q, W, Page Up and Page Down, the arrows and Num 2, 4, 6 and 8),
+    # Ctrl, which skips messages, F1, F2 and F12 of RGSS, and F5 to F9, which the game takes.
+    GAME_KEYS = [0x0D, 0x20, 0x5A, 0x1B, 0x58, 0x60, 0xA0, 0xA1, 0x41, 0x53, 0x44, 0x51, 0x57, 0x21,
+                 0x22, 0x25, 0x26, 0x27, 0x28, 0x62, 0x64, 0x66, 0x68, 0xA2, 0xA3, 0x70, 0x71, 0x7B,
+                 0x74, 0x75, 0x76, 0x77, 0x78]
+
+    # Names of the keys whose name is no character of the keyboard's layout.
+    NAMES = {
+      0x08 => "Backspace", 0x09 => "Tab", 0x0D => "Enter", 0x13 => "Pause", 0x14 => "Caps Lock",
+      0x1B => "Esc", 0x20 => "Space", 0x21 => "Page Up", 0x22 => "Page Down", 0x23 => "End",
+      0x24 => "Home", 0x25 => "Left", 0x26 => "Up", 0x27 => "Right", 0x28 => "Down",
+      0x29 => "Select", 0x2A => "Print", 0x2B => "Execute", 0x2C => "Print Screen",
+      0x2D => "Insert", 0x2E => "Delete", 0x5D => "Menu", 0x6A => "Num *", 0x6B => "Num +",
+      0x6C => "Num Separator", 0x6D => "Num -", 0x6E => "Num .", 0x6F => "Num /", 0x90 => "Num Lock",
+      0x91 => "Scroll Lock", 0xA0 => "Left Shift", 0xA1 => "Right Shift", 0xA2 => "Left Ctrl",
+      0xA3 => "Right Ctrl", 0xA4 => "Left Alt", 0xA5 => "Right Alt",
+    }
+    (0x30..0x39).each { |code| NAMES[code] = (code - 0x30).to_s }
+    (0x41..0x5A).each { |code| NAMES[code] = code.chr }
+    (0x60..0x69).each { |code| NAMES[code] = "Num #{code - 0x60}" }
+    (0x70..0x87).each { |code| NAMES[code] = "F#{code - 0x6F}" }
+
+    # Names a key: from NAMES, else the character the keyboard's layout prints on it.
+    #
+    # @param code [Integer] The key's Windows code, 0 for none.
+    # @return [String] The name, such as "F11" or "Ü".
+    def self.name(code)
+      return "None" if code.to_i <= 0
+
+      NAMES[code] || layout_name(code) || format("Key %02X", code)
+    end
+
+    # Asks Windows for the character the keyboard's layout prints on a key.
+    #
+    # @param code [Integer] The key's Windows code.
+    # @return [String, nil] The character, nil when Windows has none.
+    def self.layout_name(code)
+      scan = api('MapVirtualKeyW', 'ii', 'i').call(code, 0)
+      return nil if scan == 0
+
+      buffer = "\0" * 64
+      length = api('GetKeyNameTextW', 'ipi', 'i').call(scan << 16, buffer, 32)
+      length > 0 ? buffer.unpack('v*')[0, length].pack('U*') : nil
+    rescue
+      nil
+    end
+
+    # Tells whether the game uses a key itself.
+    #
+    # @param code [Integer] The key's Windows code.
+    # @return [Boolean] Whether it does.
+    def self.game_key?(code)
+      GAME_KEYS.include?(code)
+    end
+
+    # Starts watching for the next key, leaving out the keys held now, such as the one that confirmed.
+    def self.start_watch
+      @held = BINDABLE.select { |code| down?(code) }
+    end
+
+    # Finds a key that went down since the last look, while the game's window is in front.
+    #
+    # @return [Integer, nil] The key's Windows code, nil when none went down.
+    def self.watch
+      down = BINDABLE.select { |code| down?(code) }
+      pressed = (down - @held.to_a).first
+      @held = down
+      pressed && in_front? ? pressed : nil
+    end
+
+    # Tells whether a key is down.
+    #
+    # @param code [Integer] The key's Windows code.
+    # @return [Boolean] Whether it is.
+    def self.down?(code)
+      (api('GetAsyncKeyState', 'i', 'i').call(code) & DOWN) != 0
+    end
+
+    # Tells whether the game's window is in front, since Windows reports the keys pressed in any window.
+    #
+    # @return [Boolean] Whether the window in front belongs to this game.
+    def self.in_front?
+      owner = [0].pack('L')
+      api('GetWindowThreadProcessId', 'lp', 'l').call(api('GetForegroundWindow', 'v', 'l').call, owner)
+      @process_id ||= Win32API.new('kernel32', 'GetCurrentProcessId', 'v', 'l').call
+      owner.unpack('L')[0] == @process_id
+    end
+
+    # Loads a function of user32.dll.
+    #
+    # @param name [String] The function.
+    # @param arguments [String] Its arguments, in Win32API notation.
+    # @param result [String] Its result, in Win32API notation.
+    # @return [Win32API] The function, loaded once.
+    def self.api(name, arguments, result)
+      @functions ||= {}
+      @functions[name] ||= Win32API.new('user32', name, arguments, result)
+    end
+  end
 end
 
 unless ModConfigRemake::ORIGINAL
@@ -231,12 +397,16 @@ Object.send(:remove_const, :Window_ModConfig) if ModConfigRemake::ORIGINAL && Ob
 
 # The options of the mod chosen in the list of mods: an option's name and value per row, changed with
 # left and right, greyed out while its :enable proc says no. Confirming a row without values calls
-# the handler named after its key, so the buttons of mods work.
+# the handler named after its key, so the buttons of mods work; confirming a key binding waits for
+# the next key pressed.
 #
 # Its rows are the chosen mod's options, so an index counts those, not every entry of MOD_CONTENTS.
 class Window_ModConfig < Window_Selectable
   # Mods made for the Mod Config Menu reopen this window and read DATA or MOD_CONTENTS unqualified.
   include NWConst::Config
+
+  # What a key binding's row shows while it waits for the key.
+  WAITING_TEXT = "Press a key . . ."
 
   # Creates the options, hidden, below the help of the options screen.
   def initialize
@@ -370,8 +540,29 @@ class Window_ModConfig < Window_Selectable
     rect = item_rect_for_text(index)
     change_color(normal_color, ModConfigRemake.enabled?(row))
     draw_text(rect, ModConfigRemake.text(row[:name]).sub(ModConfigRemake::MOD_NAME, ""))
-    draw_text(rect, ModConfigRemake.value_text(row), 2) if row[:sub]
+    if @mod_config_remake_binding && @mod_config_remake_binding.equal?(row)
+      change_color(system_color)
+      draw_text(rect, WAITING_TEXT, 2)
+    elsif row[:sub] || ModConfigRemake.key_binding?(row)
+      draw_text(rect, ModConfigRemake.value_text(row), 2)
+    end
     change_color(normal_color)
+  end
+
+  # Takes the next key pressed while a key binding waits for it, and the input as usual otherwise.
+  def update
+    super
+    update_binding if @mod_config_remake_binding
+  end
+
+  # Moves the cursor, unless a key binding waits for its key.
+  def process_cursor_move
+    super unless @mod_config_remake_binding
+  end
+
+  # Confirms or cancels, unless a key binding waits for its key.
+  def process_handling
+    super unless @mod_config_remake_binding
   end
 
   # Lets every row be confirmed, which the menu answers itself.
@@ -381,12 +572,14 @@ class Window_ModConfig < Window_Selectable
     true
   end
 
-  # Moves an option to its next value, or presses a button: calls the handler named after its key.
+  # Moves an option to its next value, waits for a key binding's new key, or presses a button: calls
+  # the handler named after its key.
   def process_ok
     row = entry
     return unless row
     return change_value(1) if row[:sub]
     return Sound.play_buzzer unless ModConfigRemake.enabled?(row)
+    return start_binding(row) if ModConfigRemake.key_binding?(row)
 
     Sound.play_ok
     Input.update
@@ -431,6 +624,75 @@ class Window_ModConfig < Window_Selectable
     ModConfigRemake.safely { row[:on_change].call(value) } if row[:on_change].respond_to?(:call)
     Sound.play_cursor
     refresh
+  end
+
+  # Has a key binding wait for the next key pressed.
+  #
+  # @param row [Hash] The key binding's entry.
+  def start_binding(row)
+    Sound.play_ok
+    @mod_config_remake_binding = row
+    @mod_config_remake_key = nil
+    ModConfigRemake::Keys.start_watch
+    refresh
+    ask_for_key
+  end
+
+  # Takes the key pressed for the waiting key binding: Escape keeps the old key, a key the game uses
+  # or another option has is refused, any other key becomes the option's.
+  #
+  # The binding ends only once the key is released, so the game's input never sees its press and
+  # Escape or a key the game also reads does not reach the menu.
+  def update_binding
+    return finish_binding unless @mod_config_remake_key.nil? || ModConfigRemake::Keys.down?(@mod_config_remake_key)
+
+    code = ModConfigRemake::Keys.watch
+    return unless code && @mod_config_remake_key.nil?
+
+    if code == ModConfigRemake::Keys::ESCAPE
+      Sound.play_cancel
+      @mod_config_remake_key = code
+    elsif ModConfigRemake::Keys.game_key?(code)
+      Sound.play_buzzer
+      ask_for_key("#{ModConfigRemake::Keys.name(code)} is one of the game's own keys.")
+    elsif (owner = ModConfigRemake.key_owner(code, @mod_config_remake_binding))
+      Sound.play_buzzer
+      ask_for_key("#{ModConfigRemake::Keys.name(code)} is already the key of #{ModConfigRemake.option_name(owner)}.")
+    else
+      bind_key(code)
+      @mod_config_remake_key = code
+    end
+  end
+
+  # Makes a key the waiting option's, and tells its mod.
+  #
+  # @param code [Integer] The key's Windows code.
+  def bind_key(code)
+    row = @mod_config_remake_binding
+    $game_system.conf[row[:key]] = code unless row[:value].respond_to?(:call)
+    ModConfigRemake.safely { row[:on_change].call(code) } if row[:on_change].respond_to?(:call)
+    Sound.play_ok
+  end
+
+  # Ends the wait for a key, once the key pressed is released.
+  def finish_binding
+    @mod_config_remake_binding = nil
+    @mod_config_remake_key = nil
+    refresh
+  end
+
+  # Tells in the help which key the waiting option wants.
+  #
+  # @param refusal [String, nil] Why the last key pressed was refused, nil for none.
+  def ask_for_key(refusal = nil)
+    return unless @help_window
+
+    current = ModConfigRemake.value_text(@mod_config_remake_binding)
+    if refusal
+      @help_window.set_text("#{refusal}\r\nPress another key, or Esc to keep #{current}.")
+    else
+      @help_window.set_text("Press the new key for #{ModConfigRemake.option_name(@mod_config_remake_binding)}.\r\nEsc keeps #{current}.")
+    end
   end
 end
 
