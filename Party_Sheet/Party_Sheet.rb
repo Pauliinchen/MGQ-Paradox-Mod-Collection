@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Wrote the sheet in game folders with Japanese or other non-ASCII names
+#      Paulinchen  2026-10-03: Wrote the sheet into Party sheets, named after the save the party is in
+#                            - Wrote the sheet in game folders with Japanese or other non-ASCII names
 #      Paulinchen  2026-09-29: Ignored the hotkey while another mod takes typed text
 #      Paulinchen  2026-09-28: Replaced the F7 key with a Hotkey option that picks among keys the game leaves free.
 #      Paulinchen  2026-09-27: Added a Theme option that makes the page white and gold for Ilias, dark and purple for Alice.
@@ -12,10 +13,10 @@
 #
 #----------------------------------------------------------------
 
-# Writes Party Sheet.html next to Game.exe at the press of a hotkey or from the Mod Config Menu: every
-# party member with the full picture of the Library, levels, stats, equipment, abilities, trait and
-# the jobs and races mastered. It can also take an image of the Frontline. It must never interrupt
-# the game, so every entry point rescues.
+# Writes a page per save into Party sheets next to Game.exe at the press of a hotkey or from the
+# Mod Config Menu: every party member with the full picture of the Library, levels, stats,
+# equipment, abilities, trait and the jobs and races mastered. It can also take an image of the
+# Frontline. It must never interrupt the game, so every entry point rescues.
 module MGQ_PartySheet
   # Turns the sheet off without uninstalling it.
   ENABLED = true
@@ -24,17 +25,20 @@ module MGQ_PartySheet
   # Embedded, the page can be moved and shared on its own, at a few MB.
   EMBED_IMAGES = true
 
-  # Page written next to Game.exe.
-  FILE = "Party Sheet.html"
+  # Folder next to Game.exe that holds the sheets.
+  FOLDER = "Party sheets"
+
+  # Page written into FOLDER after the save's name, like 05_party_sheet.html.
+  FILE = "party_sheet.html"
 
   # Quality from 0 to 1 at which the browser converts the page's embedded portraits to WebP,
   # several times smaller than the game's PNGs. nil keeps the PNGs.
   PORTRAIT_QUALITY = 0.85
 
-  # Image of the Frontline written next to the page.
-  IMAGE_FILE = "Party Sheet.png"
+  # Image of the Frontline written next to the page after the save's name, like 05_party_sheet.png.
+  IMAGE_FILE = "party_sheet.png"
 
-  # Log next to the page, which only appears when something went wrong.
+  # Log next to Game.exe, which only appears when something went wrong.
   LOG_FILE = "Party Sheet.log"
 
   # Lines logged per session at most, a part missing from the game would be logged at every write.
@@ -60,8 +64,9 @@ module MGQ_PartySheet
       return
     end
 
+    Dir.mkdir(path(FOLDER)) unless File.directory?(path(FOLDER))
     page = Options.page? ? Page.build : nil
-    File.open(path(FILE), "wb") { |file| file.write(page) } if page
+    File.open(sheet(FILE), "wb") { |file| file.write(page) } if page
     Browser.run(page, Options.image?)
     Sound.play_save
   rescue => e
@@ -95,6 +100,12 @@ module MGQ_PartySheet
     "#{game_dir}/#{name}"
   end
 
+  # @param file [String] FILE or IMAGE_FILE
+  # @return [String] the full path of that file of the save the party is in, inside FOLDER
+  def self.sheet(file)
+    path("#{FOLDER}/#{Slot.name}_#{file}")
+  end
+
   # @param name [String] the file name, relative to the game folder
   # @return [Boolean] whether the file is in the game folder, false for one inside Game.rgss3a
   def self.exist?(name)
@@ -125,6 +136,28 @@ module MGQ_PartySheet
 
     File.open(path(LOG_FILE), "ab") { |file| file.write("#{Time.now}  #{message}\n") }
   rescue
+  end
+
+  # The save the party was last saved to or loaded from, which names its sheet.
+  #
+  # The game's own last_savefile_index stays 0 after a new game or a loaded autosave, so it would
+  # name those after the first slot.
+  module Slot
+    # @param index [Integer, String, nil] the game's index of the save: a slot from 0, the number of
+    #   an autosave like "01", nil for a new game
+    def self.index=(index)
+      @index = index
+    end
+
+    # @return [String] the save's number as its file has it, like 05, autosave01 for an autosave,
+    #   unsaved for a new game not saved yet
+    def self.name
+      case @index
+      when Integer then format("%02d", @index + 1)
+      when nil     then "unsaved"
+      else              "autosave#{@index}"
+      end
+    end
   end
 
   # Passes text to and from Windows in UTF-16.
@@ -236,9 +269,9 @@ module MGQ_PartySheet
 
     # Output's values by their name and help in the menu. The first one is the default.
     OUTPUTS = {
-      0 => ["Page and Image", "Party Sheet.html with the whole party, and Party Sheet.png of the Frontline."],
-      1 => ["Page",           "Party Sheet.html with the whole party."],
-      2 => ["Image",          "Party Sheet.png of the Frontline."],
+      0 => ["Page and Image", "A page with the whole party, and an image of the Frontline."],
+      1 => ["Page",           "A page with the whole party."],
+      2 => ["Image",          "An image of the Frontline."],
     }
 
     # Hotkey's values, Windows key codes, by the key's name. The first one is the default.
@@ -270,7 +303,7 @@ module MGQ_PartySheet
       config = NWConst::Config
       @menu = config.const_defined?(:MOD_CONTENTS) ? config::MOD_CONTENTS : config::CONTENTS
 
-      add(OUTPUT, "[Party Sheet] Output", "What the party sheet writes into the game folder.", OUTPUTS)
+      add(OUTPUT, "[Party Sheet] Output", "What the party sheet writes into the Party sheets folder.", OUTPUTS)
       @menu.insert(-2, :key => WRITE, :name => "     -> Write Party Sheet", :sub => false,
                        :help => "Write the party sheet now. The key picked under Hotkey does the same anywhere in the game.")
       add(HOTKEY, "[Party Sheet] Hotkey", "The key that writes the party sheet anywhere in the game.", hotkey_values)
@@ -1121,10 +1154,18 @@ module MGQ_PartySheet
     # @param file [String] the image, relative to the game folder
     # @return [String] the src that shows it
     def self.file(file)
-      return Text.url(file) unless EMBED_IMAGES
+      return link(file) unless EMBED_IMAGES
 
       data = File.open(MGQ_PartySheet.path(file), "rb") { |stream| stream.read }
       data_uri(MEDIA_TYPES[File.extname(file).downcase], data)
+    end
+
+    # Links a loose image from the page, which lies in FOLDER. The page's policy forbids a base tag.
+    #
+    # @param file [String] the image, relative to the game folder
+    # @return [String] its address relative to the page
+    def self.link(file)
+      "../#{Text.url(file)}"
     end
 
     # Cuts a face out of its sheet, loaded through the game so a packed Game.rgss3a works too.
@@ -1315,8 +1356,8 @@ if ($Frontline) {
                    "-Browser #{quoted(browser)}",
                    "-UserData #{quoted(work_path('Browser'))}",
                    "-Log #{quoted(MGQ_PartySheet.path(LOG_FILE))}"]
-      arguments += ["-Convert #{quoted(work_path(CONVERT_FILE))}", "-Page #{quoted(MGQ_PartySheet.path(FILE))}"] if convert
-      arguments += ["-Frontline #{quoted(work_path(FRONTLINE_FILE))}", "-Image #{quoted(MGQ_PartySheet.path(IMAGE_FILE))}"] if image
+      arguments += ["-Convert #{quoted(work_path(CONVERT_FILE))}", "-Page #{quoted(MGQ_PartySheet.sheet(FILE))}"] if convert
+      arguments += ["-Frontline #{quoted(work_path(FRONTLINE_FILE))}", "-Image #{quoted(MGQ_PartySheet.sheet(IMAGE_FILE))}"] if image
       arguments.join(" ")
     end
 
@@ -1324,7 +1365,7 @@ if ($Frontline) {
     #
     # @return [String, nil] the base address of the image's page, nil while the images are embedded
     def self.base
-      EMBED_IMAGES ? nil : "file:///#{Text.url(MGQ_PartySheet.game_dir)}/"
+      EMBED_IMAGES ? nil : "file:///#{Text.url(MGQ_PartySheet.path(FOLDER))}/"
     end
 
     # @param name [String] a file name inside WORK_DIR, "" for the folder itself
@@ -1602,7 +1643,7 @@ h4{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.1em
 .equips .gem>span{display:inline-flex;align-items:center;gap:4px;font-size:13px}
 .equips .gem .chips{margin-top:4px}
 .icon{display:block;width:24px;height:24px}
-.sprite{background-image:url("Graphics/System/IconSet.png");background-repeat:no-repeat}
+.sprite{background-image:url("../Graphics/System/IconSet.png");background-repeat:no-repeat}
 .empty{color:var(--muted);font-style:italic}
 .equips details{grid-column:3;margin:0 0 4px;padding:2px 8px}
 .equips .chips>span{font-size:11px;background:var(--chip);color:var(--chip-text);border:0;border-radius:4px;padding:1px 6px}
@@ -1826,7 +1867,7 @@ body{margin:0;background:var(--bg)}
       return nil unless file
 
       position = sprite_position(actor.face_index, Images::FACE_SIZE, Images::FACES_PER_ROW)
-      "<div class=\"face\" style=\"background-image:url('#{Text.url(file)}');background-position:#{position}\"></div>"
+      "<div class=\"face\" style=\"background-image:url('#{Images.link(file)}');background-position:#{position}\"></div>"
     rescue
       nil
     end
@@ -2100,6 +2141,34 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
     end
   rescue => e
     MGQ_PartySheet.log("hotkey hook FAILED: #{e.class}: #{e.message}")
+  end
+
+  # Saving to a slot, loading any save and a new game go through these, autosaving does not.
+  begin
+    class << DataManager
+      alias mgq_party_sheet_save_game_without_rescue save_game_without_rescue
+      def save_game_without_rescue(index, *args)
+        result = mgq_party_sheet_save_game_without_rescue(index, *args)
+        MGQ_PartySheet::Slot.index = index
+        result
+      end
+
+      alias mgq_party_sheet_load_game_without_rescue load_game_without_rescue
+      def load_game_without_rescue(index, *args)
+        result = mgq_party_sheet_load_game_without_rescue(index, *args)
+        MGQ_PartySheet::Slot.index = index
+        result
+      end
+
+      alias mgq_party_sheet_setup_new_game setup_new_game
+      def setup_new_game(*args)
+        result = mgq_party_sheet_setup_new_game(*args)
+        MGQ_PartySheet::Slot.index = nil
+        result
+      end
+    end
+  rescue => e
+    MGQ_PartySheet.log("save slot hooks FAILED: #{e.class}: #{e.message}")
   end
 
   # The config windows draw every option again after each change, so Shown Theme comes and goes

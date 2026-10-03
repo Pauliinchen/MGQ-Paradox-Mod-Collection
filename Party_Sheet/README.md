@@ -1,6 +1,8 @@
 # Party Sheet
 
-Press **P** anywhere in the game to write `Party Sheet.html` into the game folder: a card for every party member, split into the Frontline and the Reserve, with play time, gold and location on top. Open it in any browser.
+Press **P** anywhere in the game to write a party sheet into the `Party sheets` folder of the game folder: a card for every party member, split into the Frontline and the Reserve, with play time, gold and location on top. Open it in any browser.
+
+Each save gets its own sheet, named after the save you last loaded or saved to: `05_party_sheet.html` for save 5, `autosave01_party_sheet.html` after loading the autosave, `unsaved_party_sheet.html` for a new game you haven't saved yet. Writing the sheet again replaces that save's sheet.
 
 ![A part of the sheet: four Frontline cards with their stats, equipment, abilities and trait, some lists unfolded and an item's description shown](preview.png)
 
@@ -26,7 +28,7 @@ The images are inside the page, so it can be moved or shared on its own. A few s
 
 ## Frontline image
 
-P also writes `Party Sheet.png`: the Frontline's cards side by side, without the folded lists. It fits Discord well, where images show right in the chat.
+P also writes an image next to the page, like `05_party_sheet.png`: the Frontline's cards side by side, without the folded lists. It fits Discord well, where images show right in the chat.
 
 The image is taken by Microsoft Edge, or Google Chrome if Edge is missing, which runs in the background without a window. The game doesn't wait for it; the image appears a few seconds later.
 
@@ -46,14 +48,14 @@ With the Mod Config Menu installed, the options are there, otherwise at the end 
 1. Install the community's mod loader: the `Patch.rb` from [*Patch.rb (enable Type 1 mods)*](https://mgq.miraheze.org/wiki/Paradox_mods#Patch.rb_(enable_Type_1_mods)) on the MGQ wiki, in your `Patch` folder. If you already use other Patch folder mods, you have it.
 2. [Download `Party_Sheet.rb`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Party_Sheet.rb) and put it into the `Patch` folder.
 
-To uninstall, delete `Patch\Party_Sheet.rb`, and the `Party Sheet` files in the game folder if you like.
+To uninstall, delete `Patch\Party_Sheet.rb`, and the `Party sheets` folder in the game folder if you like.
 
 ## Settings
 
 These are constants at the top of `Party_Sheet.rb`. Open it in any text editor to change them.
 
 - `ENABLED`: turns the mod off without uninstalling it.
-- `EMBED_IMAGES`: set to `false` for a much smaller page that loads its images from the game folder instead. It then only works while it stays in the game folder.
+- `EMBED_IMAGES`: set to `false` for a much smaller page that loads its images from the game folder instead. It then only works while it stays in the `Party sheets` folder.
 - `PORTRAIT_QUALITY`: the WebP quality of the portraits, from 0 to 1, `0.85` by default. Set it to `nil` to keep the game's PNGs.
 
 If something is missing from the page or no image appears, `Party Sheet.log` in the game folder says why.
@@ -66,6 +68,7 @@ The pictures need the game's graphics as loose files in its `Graphics` folder. W
 
 The mod replaces no game methods. It runs alongside these, leaving what they do unchanged:
 
+- `DataManager.save_game_without_rescue`, `DataManager.load_game_without_rescue` and `DataManager.setup_new_game`, to name the sheet after the save
 - `Scene_Base#update_basic`
 - `Scene_Config#start`
 - `Window_Config#refresh` and the Mod Config Menu's `Window_ModConfig#refresh`, to show Shown Theme only while Theme is Static
