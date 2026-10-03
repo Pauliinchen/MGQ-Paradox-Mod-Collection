@@ -1938,7 +1938,7 @@ body{margin:0;background:var(--bg)}
 .lines{display:flex;gap:12px;width:100%;align-items:flex-start}
 .lines .chips{flex:1;min-width:0;margin:0}
 .lines .chips:first-child:not(:last-child){flex:none;flex-direction:column;align-items:flex-start;align-self:stretch;padding-right:12px;border-right:1px solid var(--line)}
-.needs{display:grid;align-content:start;gap:5px;width:calc(50% - 2px);padding:5px 8px 7px;border:1px solid var(--line);border-radius:8px;background:var(--tile)}
+.needs{display:grid;align-content:start;gap:5px;flex:1 1 calc(50% - 2px);padding:5px 8px 7px;border:1px solid var(--line);border-radius:8px;background:var(--tile)}
 .needs b{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--gold)}
 .needs .chips{margin:0}
 .pools{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
