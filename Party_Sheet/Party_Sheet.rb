@@ -760,13 +760,14 @@ module MGQ_PartySheet
     #
     # @param actor [Game_Actor] the actor
     # @return [Array<Array(String, String, String, Integer)>] each effect's category and name, how
-    #   its sources were combined, nil for one source, and how many of it apply one by one
+    #   its sources were combined, nil for one source, and how many of it apply one by one, the
+    #   largest first
     def self.effects(actor)
       objects = actor.feature_objects
       table = namer.enchant_method_table
       codes = table.keys.reject { |code| NOT_EFFECTS.include?(table[code]) }
 
-      codes.map { |code| Combine.effects(objects.features(code)) }.flatten(1)
+      by_magnitude(codes.map { |code| Combine.effects(objects.features(code)) }.flatten(1))
     end
 
     # Combines an actor's boosters per element, skill type, weapon type or skill, the way the game
@@ -774,10 +775,26 @@ module MGQ_PartySheet
     #
     # @param actor [Game_Actor] the actor
     # @return [Array<Array(String, String, String)>] each boost's category and name, and how its
-    #   sources were combined, nil for one source
+    #   sources were combined, nil for one source, the largest first
     def self.boosts(actor)
       code = namer.enchant_method_table.key(:multi_booster_name)
-      Combine.boosts(code, actor.feature_objects.features(code))
+      by_magnitude(Combine.boosts(code, actor.feature_objects.features(code)))
+    end
+
+    # The amount in an effect's or boost's name, like 150 in Dagger Booster 150%.
+    AMOUNT = /\d+(?:\.\d+)?/
+
+    # Sorts effects or boosts by the amount in their names, the largest first, and those of one
+    # amount by name. Those without an amount follow, by name.
+    #
+    # @param entries [Array<Array>] the effects or boosts, each with its name second
+    # @return [Array<Array>] the entries sorted
+    def self.by_magnitude(entries)
+      entries.each_with_index.sort_by do |entry, index|
+        name = Text.plain(entry[1])
+        amount = name.gsub(/(\d),(\d)/, '\1\2')[AMOUNT]
+        [amount ? 0 : 1, amount ? -amount.to_f : 0, name.downcase, index]
+      end.map(&:first)
     end
 
     # @param features [Array<RPG::BaseItem::Feature>] the features
