@@ -21,7 +21,11 @@ Longer lists fold away and open with a click:
 
 - the effects of each item, and its gems with their effects
 - each ability category
-- **Applied Effects**: the element and status resists, usable skill types, effects and boosts everything on the character adds up to. Effects and boosts are sorted into categories like Strikes, SP, Defense or Element. Effects from several sources are combined the way the game combines them in battle (added up, multiplied, the highest counting, or chances combined) and marked with ∑; hover them for the calculation.
+- **Applied Effects**: the resists, usable skill types, effects and boosts everything on the character adds up to.
+  - The resists are every list the game's status screen shows, under its names there, so a list another mod adds to that screen shows up too.
+  - Effects and boosts are sorted into categories like Strikes, SP, Defense or Element, the largest amount first, then by name. Effects from several sources are combined the way the game combines them in battle (added up, multiplied, the highest counting, or chances combined) and marked with ∑; hover them for the calculation.
+  - HP, MP and SP costs show what skills really cost: the rate every skill costs, and the skill types and skills that cost more or less, each worked out the way the game prices them.
+  - **Chains** list the free follow-up actions the character gets, like *Dagger → Throwing → Ninjutsu*, with the damage and cost of chained skills.
 - the jobs and races mastered, sorted by rank like the job change screen, from Basic to Forbidden
 
 The images are inside the page, so it can be moved or shared on its own. A few seconds after writing it, Edge or Chrome converts the portraits to WebP in the background, which takes the page from about 8 MB to about 2 MB for a full party.

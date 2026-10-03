@@ -2,15 +2,15 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Moved equipment slots of the character image into its third column while the equipment's is the tallest
-#                            - Put each equipment slot of the character image in a box of its own
-#                            - Added Max SP to the stats, three to a row
+#      Paulinchen  2026-10-03: Showed what skills really cost in HP, MP and SP, priced the way the game does
+#                            - Listed skill chains, with the damage and cost of chained skills
+#                            - Ordered effects and boosts by their amount, then by name
+#                            - Various layout changes
+#                            - Added Max SP to the stats
 #                            - Wrote an image of everything about the member the status screen shows at the hotkey
-#                            - Let resists and traits too long for the status screen and the Library scroll
-#                            - Made Hotkey a key binding that takes the next key pressed in Mod Config Remake
-#                            - Listed a key bound there in older menus, whose list lacked it
+#                            - Made Hotkey a key binding in Mod Config Remake, a list of keys in older menus
 #                            - Read the side chosen in the untranslated game too
-#                            - Wrote the sheet into Party sheets, named after the save the party is in
+#                            - Wrote each save's sheet into Party sheets
 #                            - Wrote the sheet in game folders with Japanese or other non-ASCII names
 #      Paulinchen  2026-09-29: Ignored the hotkey while another mod takes typed text
 #      Paulinchen  2026-09-28: Replaced the F7 key with a Hotkey option that picks among keys the game leaves free.
