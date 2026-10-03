@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Added Max SP to the stats, three to a row
+#      Paulinchen  2026-10-03: Put each equipment slot of the character image in a box of its own
+#                            - Added Max SP to the stats, three to a row
 #                            - Wrote an image of everything about the member the status screen shows at the hotkey
 #                            - Let resists and traits too long for the status screen and the Library scroll
 #                            - Made Hotkey a key binding that takes the next key pressed in Mod Config Remake
@@ -1869,11 +1870,11 @@ body{margin:0;background:var(--bg)}
 .sheet .title h3{font-size:28px}
 .sheet .title span{font-size:17px}
 .sheet .trait{margin:0}
-.sheet .equips{gap:8px}
-.sheet .equips li{grid-template-columns:72px 24px 1fr;align-items:start}
-.sheet .equips li>.icon{margin-top:-1px}
-.sheet .slot{padding-top:2px}
-.more{grid-column:2/4;display:grid;gap:4px}
+.gear{display:grid;gap:8px}
+.slot-box{display:grid;gap:6px;padding:8px 10px;border-radius:8px;background:var(--tile)}
+.slot-box .slot{font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.slot-box .item{display:flex;align-items:center;gap:8px;font-size:15px}
+.more{display:grid;gap:4px}
 .more>.chips{margin-top:0}
 .sheet .gem{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:0;font-size:12px;color:var(--muted)}
 .sheet .gem .icon{width:18px;height:18px}
@@ -1990,17 +1991,18 @@ body{margin:0;background:var(--bg)}
     end
 
     # @param actor [Game_Actor] the member
-    # @return [String] what she wears, slot by slot, each item with its bonuses and its gems written out
+    # @return [String] what she wears, a box per slot, each item with its bonuses and its gems
+    #   written out
     def self.gear(actor)
-      rows = Party.equipment(actor).map do |slot, item|
+      boxes = Party.equipment(actor).map do |slot, item|
         slot = "<span class=\"slot\">#{Text.game(slot)}</span>"
-        next "<li>#{slot}<span></span><span class=\"empty\">empty</span></li>" unless item
+        next "<div class=\"slot-box\">#{slot}<div class=\"item\"><span class=\"empty\">empty</span></div></div>" unless item
 
         more = chip_list(Party.bonuses(item)) + Party.gems(item).map { |gem| gem_line(gem) }.join
-        "<li>#{slot}#{icon(item.icon_index)}<span class=\"name\">#{Text.game(item.name)}</span>" \
-          "#{more.empty? ? '' : "<div class=\"more\">#{more}</div>"}</li>"
+        "<div class=\"slot-box\">#{slot}<div class=\"item\">#{icon(item.icon_index)}<span>#{Text.game(item.name)}</span></div>" \
+          "#{more.empty? ? '' : "<div class=\"more\">#{more}</div>"}</div>"
       end
-      "<h4>Equipment</h4><ul class=\"equips\">#{rows.join}</ul>"
+      "<h4>Equipment</h4><div class=\"gear\">#{boxes.join}</div>"
     end
 
     # @param gem [RPG::Item, nil] the gem in a socket, nil for an empty socket
