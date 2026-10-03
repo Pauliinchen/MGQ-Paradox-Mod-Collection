@@ -767,7 +767,90 @@ module MGQ_PartySheet
       table = namer.enchant_method_table
       codes = table.keys.reject { |code| NOT_EFFECTS.include?(table[code]) }
 
-      by_magnitude(codes.map { |code| Combine.effects(objects.features(code)) }.flatten(1)) + chains(actor)
+      effects = codes.map { |code| Combine.effects(without_costs(objects.features(code))) }.flatten(1)
+      by_magnitude(effects + costs(actor)) + chains(actor)
+    end
+
+    # Rates of skill costs, by their data id's name, which costs shows as the rates they add up to.
+    COST_FEATURES = [:STYPE_COST_RATE, :SKILL_COST_RATE, :TP_COST_RATE, :HP_COST_RATE]
+
+    # @param features [Array<RPG::BaseItem::Feature>] features of one code
+    # @return [Array<RPG::BaseItem::Feature>] the features without the rates of skill costs
+    def self.without_costs(features)
+      code = Combine.constant(nil, :FEATURE_BATTLER_ABILITY)
+      ids = COST_FEATURES.map { |name| Combine.constant(:Battler, name) }.compact
+      features.reject { |feature| feature.code == code && ids.include?(feature.data_id) }
+    end
+
+    # Each kind of skill cost: its effect category, the actor's method for the rate of every skill,
+    # and the game's name of the kind.
+    COSTS = [["HP", :hp_cost_rate, :HP], ["MP", :mcr, :MP], ["SP", :tp_cost_rate, :TP]]
+
+    # Works out what an actor's skills cost against their base cost, by the methods the game prices
+    # skills with: the rate of every skill, times the rate of each of a skill's types, times the
+    # skill's own rate. Lists the types and the skills she knows whose rate differs from every
+    # skill's, then the rate of every other skill unless it is 100%.
+    #
+    # @param actor [Game_Actor] the actor
+    # @return [Array<Array(String, String, String, Integer)>] each rate's category and name, like
+    #   "Dagger SP Cost 514.8%", the rates it multiplies, nil for the rate of every skill, and 1
+    def self.costs(actor)
+      skills = actor.skills.reject { |skill| Text.plain(skill.name).empty? }
+      stypes = skills.map(&:stypes).flatten.uniq.sort
+      own_ids = own_cost_skill_ids(actor)
+
+      COSTS.map do |category, method, type|
+        next [] unless actor.respond_to?(method)
+
+        every = actor.send(method)
+        lines = stypes.map do |id|
+          rate = actor.stype_cost_rate(id, type)
+          next nil if rate == 1.0
+
+          name = Text.plain($data_system.skill_types[id])
+          cost_line(category, name, [["Every skill", every], [name, rate]])
+        end.compact
+        lines += skills.select { |skill| own_ids.include?(skill.id) }.map do |skill|
+          own = actor.skill_cost_rate(skill.id, type)
+          next nil if own == 1.0
+
+          name = Text.plain(skill.name)
+          types = skill.stypes.map { |id| [Text.plain($data_system.skill_types[id]), actor.stype_cost_rate(id, type)] }
+          cost_line(category, name, [["Every skill", every]] + types + [[name, own]])
+        end.compact
+        lines.unshift(cost_line(category, lines.empty? ? nil : "Other Skills", [["Every skill", every]])) unless every == 1.0
+        lines
+      end.flatten(1)
+    end
+
+    # @param actor [Game_Actor] the actor
+    # @return [Array<Integer>] the skills that have a cost rate of their own
+    def self.own_cost_skill_ids(actor)
+      code = Combine.constant(nil, :FEATURE_BATTLER_ABILITY)
+      id = Combine.constant(:Battler, :SKILL_COST_RATE)
+      return [] unless code && id
+
+      actor.feature_objects.features(code).select { |feature| feature.data_id == id }.map { |feature| feature.value[:id] }.uniq
+    end
+
+    # @param category [String] the cost's effect category, HP, MP or SP
+    # @param subject [String, nil] the skill type or skill the rate is for, nil for every skill
+    # @param factors [Array<Array(String, Float)>] the rates the game multiplies, each with what it is for
+    # @return [Array(String, String, String, Integer)] the rate's category and name, the factors
+    #   other than 100% multiplied, nil for fewer than two, and 1
+    def self.cost_line(category, subject, factors)
+      total = factors.inject(1.0) { |all, (_, rate)| all * rate }
+      shown = factors.reject { |_, rate| rate == 1.0 }
+      parts = shown.map { |label, rate| "#{label} #{rate_text(rate)}" }
+      formula = shown.size > 1 ? "#{parts.join(' × ')} = #{rate_text(total)}" : nil
+      [category, "#{subject ? "#{subject} " : ''}#{category} Cost #{rate_text(total)}", formula, 1]
+    end
+
+    # @param rate [Float] a rate, 1.0 being 100%
+    # @return [String] the rate in percent with up to two decimals, like 514.8%
+    def self.rate_text(rate)
+      percent = (rate * 100).round(2)
+      "#{percent == percent.to_i ? percent.to_i : percent}%"
     end
 
     # Category of the skill chains among the effects.
