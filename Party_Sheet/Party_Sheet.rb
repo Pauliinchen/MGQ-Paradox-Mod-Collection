@@ -767,7 +767,65 @@ module MGQ_PartySheet
       table = namer.enchant_method_table
       codes = table.keys.reject { |code| NOT_EFFECTS.include?(table[code]) }
 
-      by_magnitude(codes.map { |code| Combine.effects(objects.features(code)) }.flatten(1))
+      by_magnitude(codes.map { |code| Combine.effects(objects.features(code)) }.flatten(1)) + chains(actor)
+    end
+
+    # Category of the skill chains among the effects.
+    CHAINS = "Chains"
+
+    # Category of the damage and cost of chained skills among the effects.
+    CHAIN_EFFECTS = "Chain Effects"
+
+    # Lists the skill chains an actor has, which the game has no names for: after a skill of a
+    # chain's first skill type she acts again, free, with a skill of the next type, and so on to
+    # its end. Chains of one first type are merged as the game merges them, so a chain only runs on
+    # from the type the first skill had; first types with the same chains share a line. The damage
+    # and cost of chained skills follow, under CHAIN_EFFECTS.
+    #
+    # @param actor [Game_Actor] the actor
+    # @return [Array<Array(String, String, String, Integer)>] each chain's category and name, like
+    #   "Dagger → Throwing → Ninjutsu", how its sources were combined and 1
+    def self.chains(actor)
+      code = Combine.constant(nil, :FEATURE_SKILL_CHAIN)
+      return [] unless code
+
+      objects = actor.feature_objects
+      trees = {}
+      objects.features(code).each do |feature|
+        node = (trees[feature.data_id] ||= {})
+        Array(feature.value).each { |id| node = (node[id] ||= {}) }
+      end
+      return [] if trees.empty?
+
+      lines = trees.keys.group_by { |id| trees[id] }.map do |tree, firsts|
+        first = firsts.map { |id| Text.plain($data_system.skill_types[id]) }.join(", ")
+        chain_paths(tree).map { |path| [CHAINS, ([first] + path.map { |id| Text.plain($data_system.skill_types[id]) }).join(" → "), nil, 1] }
+      end.flatten(1)
+      lines + chain_rates(objects)
+    end
+
+    # @param tree [Hash{Integer => Hash}] the skill types that may follow, each with its own
+    # @return [Array<Array<Integer>>] every way through the tree to an end
+    def self.chain_paths(tree)
+      tree.map { |id, rest| rest.empty? ? [[id]] : chain_paths(rest).map { |path| [id] + path } }.flatten(1)
+    end
+
+    # The features of chained skills, by their name, how the game combines them and their label.
+    CHAIN_RATES = [[:FEATURE_SKILL_CHAIN_BOOST, :sum, "Chained Skills Damage +%s"],
+                   [:FEATURE_SKILL_CHAIN_COST_RATE, :min, "Chained Skills Cost %s"]]
+
+    # @param objects [Array<RPG::BaseItem>] what gives the actor her features
+    # @return [Array<Array(String, String, String, Integer)>] the extra damage chained skills deal,
+    #   added up, and what they cost, the lowest rate counting, each with how its sources combine
+    def self.chain_rates(objects)
+      CHAIN_RATES.map do |name, rule, label|
+        code = Combine.constant(nil, name)
+        values = code ? objects.features(code).map(&:value) : []
+        next nil if values.empty?
+
+        formula = values.size > 1 ? Combine.formula(rule, values) : nil
+        [CHAIN_EFFECTS, format(label, Combine.amount(Combine.total(rule, values))), formula, 1]
+      end.compact
     end
 
     # Combines an actor's boosters per element, skill type, weapon type or skill, the way the game
@@ -999,7 +1057,7 @@ module MGQ_PartySheet
     ]
 
     # Order of the effect categories on the sheet.
-    CATEGORY_ORDER = ["Strikes", "Wielding", "SP", "MP", "HP", "Gold", "Defense", "Counters",
+    CATEGORY_ORDER = ["Strikes", "Chains", "Chain Effects", "Wielding", "SP", "MP", "HP", "Gold", "Defense", "Counters",
                       "Battle Start", "Turn", "Defeat", "After Battle", "Party", "Other"]
 
     # Category of a cost per skill type or skill, by the resource it costs as the game names it.
@@ -1877,6 +1935,9 @@ body{margin:0;background:var(--bg)}
 .proofs{column-count:6;column-gap:28px;column-rule:1px solid var(--line);margin-top:8px}
 .proofs span{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;break-inside:avoid;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .proofs .icon{flex:none;width:18px;height:18px}
+.lines{display:flex;gap:12px;width:100%;align-items:flex-start}
+.lines .chips{flex:1;min-width:0;margin:0}
+.lines .chips:first-child:not(:last-child){flex:none;flex-direction:column;align-items:flex-start;align-self:stretch;padding-right:12px;border-right:1px solid var(--line)}
 .needs{display:grid;align-content:start;gap:5px;width:calc(50% - 2px);padding:5px 8px 7px;border:1px solid var(--line);border-radius:8px;background:var(--tile)}
 .needs b{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--gold)}
 .needs .chips{margin:0}
@@ -2123,8 +2184,22 @@ body{margin:0;background:var(--bg)}
           "<div class=\"chips\">#{group.map { |entry| entry[1] }.join}</div></div>"
       end.join
       head = boxes.empty? ? "" : "<div class=\"pools\">#{boxes}</div>"
-      chips = skill_types + others.map { |category, chip, _| [category, chip] }
+      chips = skill_types + chain_lines(others.map { |category, chip, _| [category, chip] })
       categories("Effects", chips, [SKILL_TYPES] + Combine::CATEGORY_ORDER, effects.size, head)
+    end
+
+    # Puts the damage and cost of chained skills in a column of their own before the chains, in the
+    # chains' row.
+    #
+    # @param chips [Array<Array(String, String)>] each effect's category and chip
+    # @return [Array<Array(String, String)>] the chips, the chains and their effects as one chip
+    def self.chain_lines(chips)
+      lines = [Party::CHAIN_EFFECTS, Party::CHAINS].map do |category|
+        group = chips.select { |entry| entry[0] == category }.map(&:last)
+        group.empty? ? "" : "<div class=\"chips\">#{group.join}</div>"
+      end.join
+      rest = chips.reject { |entry| [Party::CHAINS, Party::CHAIN_EFFECTS].include?(entry[0]) }
+      lines.empty? ? rest : rest + [[Party::CHAINS, "<div class=\"lines\">#{lines}</div>"]]
     end
 
     # Splits a weapon boost's name into the weapon it needs and the boost, like "Scalpel Equipped"
