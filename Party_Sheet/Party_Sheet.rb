@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Let resists and traits too long for the status screen and the Library scroll
+#      Paulinchen  2026-10-03: Wrote an image of everything about the member the status screen shows at the hotkey
+#                            - Let resists and traits too long for the status screen and the Library scroll
 #                            - Made Hotkey a key binding that takes the next key pressed in Mod Config Remake
 #                            - Listed a key bound there in older menus, whose list lacked it
 #                            - Read the side chosen in the untranslated game too
@@ -42,6 +43,10 @@ module MGQ_PartySheet
   # Image of the Frontline written next to the page after the save's name, like 05_party_sheet.png.
   IMAGE_FILE = "party_sheet.png"
 
+  # Image of one member written next to the page after the save's name, followed by her name, like
+  # 05_party_sheet_Alice.png.
+  CHARACTER_FILE = "party_sheet"
+
   # Log next to Game.exe, which only appears when something went wrong.
   LOG_FILE = "Party Sheet.log"
 
@@ -75,15 +80,43 @@ module MGQ_PartySheet
     Dir.mkdir(path(FOLDER)) unless File.directory?(path(FOLDER))
     page = Options.page? ? Page.build : nil
     File.open(sheet(FILE), "wb") { |file| file.write(page) } if page
-    Browser.run(page, Options.image?)
+    Browser.run(page, Options.image? ? [[Page.frontline(Browser.base), sheet(IMAGE_FILE)]] : [])
     Sound.play_save
   rescue => e
     log("could not write the party sheet: #{e.class}: #{e.message}")
   end
 
-  # Writes the sheet when the key of the Hotkey option went down. Called once per frame.
+  # Takes the image of one member, with everything her card holds, and plays the save sound when
+  # the browser started, the buzzer when it could not.
+  #
+  # @param actor [Game_Actor] the member
+  def self.write_character(actor)
+    return unless ENABLED
+
+    Dir.mkdir(path(FOLDER)) unless File.directory?(path(FOLDER))
+    started = Browser.run(nil, [[Page.character(actor, Browser.base), sheet("#{CHARACTER_FILE}_#{file_name(actor.name)}.png")]])
+    started ? Sound.play_save : Sound.play_buzzer
+  rescue => e
+    log("could not write the sheet of #{actor.name}: #{e.class}: #{e.message}")
+  end
+
+  # Characters Windows forbids in file names, and control characters.
+  FORBIDDEN = /[\\\/:*?"<>|\x00-\x1f]/
+
+  # @param name [String] a member's name
+  # @return [String] the name as part of a file name, without what Windows forbids there
+  def self.file_name(name)
+    safe = Text.plain(name).gsub(FORBIDDEN, "").strip
+    safe.empty? ? "member" : safe
+  end
+
+  # Writes the sheet when the key of the Hotkey option went down, or the image of the member the
+  # status screen shows. Called once per frame.
   def self.check_hotkey
-    write if Keyboard.pressed?(Options.hotkey)
+    return unless Keyboard.pressed?(Options.hotkey)
+
+    actor = Party.status_actor
+    actor ? write_character(actor) : write
   rescue => e
     log("hotkey check failed: #{e.class}: #{e.message}")
   end
@@ -543,6 +576,26 @@ module MGQ_PartySheet
     # @return [RPG::Class, nil] the race, nil while she has none
     def self.race(actor)
       actor.tribe_id > 0 ? $data_classes[actor.tribe_id] : nil
+    end
+
+    # @return [Game_Actor, nil] the member the status screen shows, nil outside it
+    def self.status_actor
+      scene = SceneManager.scene
+      scene.is_a?(Scene_Status) ? scene.instance_variable_get(:@actor) : nil
+    end
+
+    # Finds the jobs or races of the highest rank an actor has any levels in, mastered or not.
+    #
+    # @param actor [Game_Actor] the actor
+    # @param kind [Symbol] :job? for jobs, :tribe? for races
+    # @return [Array(Integer, Array<RPG::Class>)] the rank and its jobs or races in id order, nil
+    #   and none when she has no levels in any
+    def self.top_rank(actor, kind)
+      classes = actor.level_list.keys.map { |id| $data_classes[id] }.compact.select { |data| data.send(kind) }
+      return [nil, []] if classes.empty?
+
+      rank = classes.map(&:class_lank).max
+      [rank, classes.select { |data| data.class_lank == rank }.sort_by(&:id)]
     end
 
     # Lists the jobs or races an actor has mastered, in the order of the game's status screen.
@@ -1316,8 +1369,11 @@ module MGQ_PartySheet
     # Copy of the page that converts its own portraits, inside WORK_DIR.
     CONVERT_FILE = "Convert.html"
 
-    # Page the image is taken of, inside WORK_DIR.
-    FRONTLINE_FILE = "Frontline.html"
+    # Page each image is taken of, inside WORK_DIR, by the image's number.
+    SHOT_FILE = "Shot%d.html"
+
+    # List of the images to take, inside WORK_DIR: a page and its image per line, split by a tab.
+    SHOTS_FILE = "Shots.txt"
 
     # Script that drives the browser, inside WORK_DIR.
     SCRIPT_FILE = "Browser.ps1"
@@ -1336,11 +1392,11 @@ module MGQ_PartySheet
 
     # Converts the page: the browser loads the converting copy and dumps it once the portraits are
     # WebP, which then replaces the page. The dump joins the html and head tags and leaves blank
-    # lines where CONVERT_SCRIPT was, which the script mends. Takes the image: the browser measures
-    # the Frontline, which its page reports on its body, then takes a screenshot at exactly that
-    # size, as a screenshot holds the browser's window and no more.
+    # lines where CONVERT_SCRIPT was, which the script mends. Takes the images: the browser measures
+    # what each page shows, which the page reports on its body, then takes a screenshot at exactly
+    # that size, as a screenshot holds the browser's window and no more.
     SCRIPT = <<-'PS1'
-param([string]$Browser, [string]$UserData, [string]$Log, [string]$Convert, [string]$Page, [string]$Frontline, [string]$Image)
+param([string]$Browser, [string]$UserData, [string]$Log, [string]$Convert, [string]$Page, [string]$Shots)
 $common = @('--headless', '--disable-gpu', '--no-first-run', '--hide-scrollbars', "--user-data-dir=$UserData")
 if ($Convert) {
   try {
@@ -1358,14 +1414,18 @@ if ($Convert) {
     Add-Content -LiteralPath $Log -Value "$(Get-Date)  portraits not converted: $_"
   }
 }
-if ($Frontline) {
-  try {
-    $url = ([Uri]$Frontline).AbsoluteUri
-    $dom = & $Browser @common '--window-size=4000,3000' '--dump-dom' $url | Out-String
-    if ($dom -notmatch 'data-size="(\d+)x(\d+)"') { throw 'the page reported no size' }
-    & $Browser @common "--window-size=$($Matches[1]),$($Matches[2])" "--screenshot=$Image" $url | Out-Null
-  } catch {
-    Add-Content -LiteralPath $Log -Value "$(Get-Date)  image failed: $_"
+if ($Shots) {
+  foreach ($line in [IO.File]::ReadAllLines($Shots, [Text.Encoding]::UTF8)) {
+    $shot, $image = $line -split "`t", 2
+    if (-not $image) { continue }
+    try {
+      $url = ([Uri]$shot).AbsoluteUri
+      $dom = & $Browser @common '--window-size=4000,3000' '--dump-dom' $url | Out-String
+      if ($dom -notmatch 'data-size="(\d+)x(\d+)"') { throw 'the page reported no size' }
+      & $Browser @common "--window-size=$($Matches[1]),$($Matches[2])" "--screenshot=$image" $url | Out-Null
+    } catch {
+      Add-Content -LiteralPath $Log -Value "$(Get-Date)  image $image failed: $_"
+    }
   }
 }
     PS1
@@ -1373,24 +1433,31 @@ if ($Frontline) {
     # Writes what the browser needs and starts the script.
     #
     # @param page [String, nil] the page just written, nil when none was
-    # @param image [Boolean] whether to take the image of the Frontline
-    def self.run(page, image)
+    # @param shots [Array<Array(String, String)>] the page and the path of each image to take
+    # @return [Boolean] whether the browser was started
+    def self.run(page, shots)
       convert = page && EMBED_IMAGES && PORTRAIT_QUALITY
-      return unless convert || image
+      return false unless convert || !shots.empty?
 
       unless browser
-        MGQ_PartySheet.log("no Microsoft Edge or Google Chrome found to convert the portraits or take #{IMAGE_FILE}")
-        return
+        MGQ_PartySheet.log("no Microsoft Edge or Google Chrome found to convert the portraits or take the images")
+        return false
       end
 
       Dir.mkdir(work_path("")) unless File.directory?(work_path(""))
       File.open(work_path(CONVERT_FILE), "wb") { |file| file.write(converting(page)) } if convert
-      File.open(work_path(FRONTLINE_FILE), "wb") { |file| file.write(Page.frontline(base)) } if image
+      list = shots.each_with_index.map do |(html, image), index|
+        file = work_path(format(SHOT_FILE, index + 1))
+        File.open(file, "wb") { |stream| stream.write(html) }
+        "#{windows_path(file)}\t#{windows_path(image)}"
+      end
+      File.open(work_path(SHOTS_FILE), "wb") { |file| file.write(list.join("\r\n")) }
       File.open(work_path(SCRIPT_FILE), "wb") { |file| file.write(SCRIPT) }
 
-      result = shell_execute.call(0, Wide.string("open"), Wide.string("powershell.exe"), Wide.string(arguments(convert, image)),
+      result = shell_execute.call(0, Wide.string("open"), Wide.string("powershell.exe"), Wide.string(arguments(convert, !list.empty?)),
                                   Wide.string(windows_path(MGQ_PartySheet.game_dir)), 0)
       MGQ_PartySheet.log("could not start PowerShell: error #{result}") if result <= 32
+      result > 32
     end
 
     # The page's policy forbids scripts, so the copy allows inline ones until CONVERT_SCRIPT puts
@@ -1404,22 +1471,23 @@ if ($Frontline) {
     end
 
     # @param convert [Boolean] whether to convert the page's portraits
-    # @param image [Boolean] whether to take the image of the Frontline
+    # @param shots [Boolean] whether to take the images SHOTS_FILE lists
     # @return [String] PowerShell's command line, running the script
-    def self.arguments(convert, image)
+    def self.arguments(convert, shots)
       arguments = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy Bypass", "-WindowStyle Hidden",
                    "-File #{quoted(work_path(SCRIPT_FILE))}",
                    "-Browser #{quoted(browser)}",
                    "-UserData #{quoted(work_path('Browser'))}",
                    "-Log #{quoted(MGQ_PartySheet.path(LOG_FILE))}"]
       arguments += ["-Convert #{quoted(work_path(CONVERT_FILE))}", "-Page #{quoted(MGQ_PartySheet.sheet(FILE))}"] if convert
-      arguments += ["-Frontline #{quoted(work_path(FRONTLINE_FILE))}", "-Image #{quoted(MGQ_PartySheet.sheet(IMAGE_FILE))}"] if image
+      arguments += ["-Shots #{quoted(work_path(SHOTS_FILE))}"] if shots
       arguments.join(" ")
     end
 
-    # The image's page lies in the temporary folder, so linked images need the game folder as base.
+    # The images' pages lie in the temporary folder, so linked images, relative to the page in
+    # FOLDER, need that folder as base.
     #
-    # @return [String, nil] the base address of the image's page, nil while the images are embedded
+    # @return [String, nil] the base address of an image's page, nil while the images are embedded
     def self.base
       EMBED_IMAGES ? nil : "file:///#{Text.url(MGQ_PartySheet.path(FOLDER))}/"
     end
@@ -1648,7 +1716,7 @@ if ($Frontline) {
 --glow:#fff3cf;--halo:#fbecc0;--shade:rgba(255,253,248,.94);--name-shadow:0 1px 4px #fff;--chip:#efe4cb;--chip-text:#5a4d33;
 --trait:linear-gradient(135deg,#fbf2da,#f6ead0);--trait-text:#4d4330;--tip:rgba(255,253,248,.92);--shadow:rgba(120,95,40,.15);--tip-shadow:rgba(120,95,40,.25);
 --good:#2d8049;--bad:#c0392b;--reflect:#2a6db5;--absorb:#7c47bf}
-.abilities summary b{color:color-mix(in srgb,var(--c) 65%,#000)}
+.abilities summary b,.ability-head b{color:color-mix(in srgb,var(--c) 65%,#000)}
     CSS
 
     # Style of the page, in the colours of DARK or LIGHT. Paths inside are relative to the game
@@ -1774,6 +1842,64 @@ body{margin:0;background:var(--bg)}
 .shot{width:fit-content;padding:24px;background:radial-gradient(900px 400px at 50% -150px,var(--glow),transparent),var(--bg)}
     CSS
 
+    # Style of one member's image: her picture, stats and profile in a narrow column, then her
+    # equipment, her abilities, and her resists and rank, and below them her Proof Abilities, her
+    # skill types with her effects, and her boosts across the whole width, where their many entries
+    # take the least height. Each part sits in a panel, every list unfolded. Comes before the
+    # palette, which darkens the ability colours for Ilias.
+    CHARACTER = <<-'CSS'
+.shot.sheet{width:1720px}
+.sheet .top{display:flex;align-items:flex-end;gap:24px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.sheet .top p{margin:4px 0 0}
+.sheet .facts{margin-left:auto;justify-content:flex-end}
+.columns{display:grid;grid-template-columns:320px repeat(3,minmax(0,1fr));gap:16px}
+.profile .rates{grid-template-columns:1fr}
+.lists{display:grid;gap:14px;margin-top:14px}
+.proofs{column-count:6;column-gap:28px;column-rule:1px solid var(--line);margin-top:8px}
+.proofs span{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;break-inside:avoid;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proofs .icon{flex:none;width:18px;height:18px}
+.needs{display:grid;align-content:start;gap:5px;width:calc(50% - 2px);padding:5px 8px 7px;border:1px solid var(--line);border-radius:8px;background:var(--tile)}
+.needs b{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--gold)}
+.needs .chips{margin:0}
+.column{display:flex;flex-direction:column;gap:14px;min-width:0}
+.column>:last-child{flex:1}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 6px 18px var(--shadow)}
+.panel h4:first-child{margin-top:0}
+.sheet .portrait{aspect-ratio:3/4;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 18px var(--shadow)}
+.sheet .title h3{font-size:28px}
+.sheet .title span{font-size:17px}
+.sheet .trait{margin:0}
+.sheet .equips{gap:8px}
+.sheet .equips li{grid-template-columns:72px 24px 1fr;align-items:start}
+.sheet .equips li>.icon{margin-top:-1px}
+.sheet .slot{padding-top:2px}
+.more{grid-column:2/4;display:grid;gap:4px}
+.more>.chips{margin-top:0}
+.sheet .gem{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:0;font-size:12px;color:var(--muted)}
+.sheet .gem .icon{width:18px;height:18px}
+.sheet .gem .chips{margin:0}
+.sheet .chips{gap:4px}
+.sheet .chips>span{display:inline-flex;align-items:center;gap:4px;font-size:12px;border:0;border-radius:4px;padding:1px 7px;background:var(--chip);color:var(--chip-text)}
+.sheet .chips .icon{width:18px;height:18px;margin-left:-4px}
+.ability{border-left:3px solid var(--c);border-radius:8px;background:var(--tile);padding:6px 10px}
+.ability-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.ability-head b{color:var(--c)}
+.ability .chips{margin-top:6px}
+.sheet h4 b{margin-left:6px;color:var(--gold);font-weight:600}
+.sheet .resists{margin-top:4px}
+.cats{display:grid}
+.cat{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:start;padding:6px 0;border-top:1px dashed var(--line)}
+.cat:first-child{border-top:0;padding-top:2px}
+.cat>span{padding-top:2px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.cat .chips{margin:0}
+.levels{display:grid;gap:4px}
+.level{display:flex;justify-content:space-between;gap:8px;padding:3px 10px;border-radius:6px;background:var(--tile);font-size:13px}
+.level span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.level b{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.level.mastered b{color:var(--gold)}
+.sheet footer{margin-top:16px;text-align:right}
+    CSS
+
     # Width of a card in the image, in pixels.
     CARD_WIDTH = 370
 
@@ -1821,6 +1947,177 @@ body{margin:0;background:var(--bg)}
       [head("#{STYLE}#{palette}#{COMPACT}#{SHOT}#{icon_style}", base_tag), '<body>', shot, SIZE_SCRIPT, '</body></html>'].join("\n")
     end
 
+    # Builds the page the image of one member is taken of: everything her card holds, unfolded,
+    # with effects and boosts as the values they add up to. It runs SIZE_SCRIPT and is never
+    # shared, so it carries no POLICY.
+    #
+    # @param actor [Game_Actor] the member
+    # @param base [String, nil] the address linked images are relative to, nil when they are embedded
+    # @return [String] the image's page
+    def self.character(actor, base)
+      @icons = {}
+      name = actor.name
+      columns = [
+        [portrait(actor),
+         panel { MGQ_PartySheet.safely("stats of #{name}") { stats(actor) } },
+         panel { MGQ_PartySheet.safely("jobs of #{name}") { classes(actor) } },
+         panel { MGQ_PartySheet.safely("trait of #{name}") { trait(actor) } }],
+        [panel { MGQ_PartySheet.safely("equipment of #{name}") { gear(actor) } }],
+        [panel { MGQ_PartySheet.safely("abilities of #{name}") { ability_list(actor) } }],
+        [panel { MGQ_PartySheet.safely("element resists of #{name}") { resist_list("Element Resists", Party.element_resists(actor)) } },
+         panel { MGQ_PartySheet.safely("status resists of #{name}") { resist_list("Status Resists", Party.state_resists(actor)) } },
+         panel { MGQ_PartySheet.safely("rank of #{name}") { top_ranks(actor) } }],
+      ]
+      lists = [panel { MGQ_PartySheet.safely("proofs of #{name}") { proof_list(actor) } },
+               panel { MGQ_PartySheet.safely("effects of #{name}") { effect_list(actor) } },
+               panel { MGQ_PartySheet.safely("boosts of #{name}") { boost_list(actor) } }]
+      body = columns.each_with_index.map do |parts, index|
+        "<div class=\"column#{index == 0 ? ' profile' : ''}\">#{parts.join}</div>"
+      end.join
+      shot = "<section class=\"shot sheet\">#{MGQ_PartySheet.safely('header') { header }}<div class=\"columns\">#{body}</div>" \
+             "<div class=\"lists\">#{lists.join}</div>" \
+             "<footer>Written by Party_Sheet.rb on #{Time.now.strftime('%Y-%m-%d %H:%M')}</footer></section>"
+
+      base_tag = base ? "<base href=\"#{Text.html(base)}\">" : ""
+      [head("#{STYLE}#{CHARACTER}#{palette}#{SHOT}#{icon_style}", base_tag), '<body>', shot, SIZE_SCRIPT, '</body></html>'].join("\n")
+    end
+
+    # @yieldreturn [String] a part of a member's image
+    # @return [String] the part in a panel, "" for an empty part
+    def self.panel
+      content = yield
+      content.empty? ? "" : "<section class=\"panel\">#{content}</section>"
+    end
+
+    # @param actor [Game_Actor] the member
+    # @return [String] what she wears, slot by slot, each item with its bonuses and its gems written out
+    def self.gear(actor)
+      rows = Party.equipment(actor).map do |slot, item|
+        slot = "<span class=\"slot\">#{Text.game(slot)}</span>"
+        next "<li>#{slot}<span></span><span class=\"empty\">empty</span></li>" unless item
+
+        more = chip_list(Party.bonuses(item)) + Party.gems(item).map { |gem| gem_line(gem) }.join
+        "<li>#{slot}#{icon(item.icon_index)}<span class=\"name\">#{Text.game(item.name)}</span>" \
+          "#{more.empty? ? '' : "<div class=\"more\">#{more}</div>"}</li>"
+      end
+      "<h4>Equipment</h4><ul class=\"equips\">#{rows.join}</ul>"
+    end
+
+    # @param gem [RPG::Item, nil] the gem in a socket, nil for an empty socket
+    # @return [String] the gem's icon and name followed by what it gives
+    def self.gem_line(gem)
+      return "<div class=\"gem\">#{icon(Images::EMPTY_SOCKET_ICON)}<span class=\"empty\">empty socket</span></div>" unless gem
+
+      "<div class=\"gem\">#{icon(gem.icon_index)}<span>#{Text.game(gem.name)}</span>#{chip_list(Party.gem_bonuses(gem))}</div>"
+    end
+
+    # @param texts [Array<String>] texts from the game's data
+    # @return [String] a chip per text, "" without any
+    def self.chip_list(texts)
+      texts.empty? ? "" : "<div class=\"chips\">#{texts.map { |text| "<span>#{Text.game(text)}</span>" }.join}</div>"
+    end
+
+    # @param actor [Game_Actor] the member
+    # @return [String] her equipped abilities per category, in its colour, with the AP it uses, ""
+    #   when she has none. Proof Abilities, which cost no AP, are left to proof_list.
+    def self.ability_list(actor)
+      blocks = Party.abilities(actor).select { |row| row[3] }.map do |id, name, skills, ap|
+        chips = skills.map { |skill| "<span>#{icon(skill.icon_index)}#{Text.game(skill.name)}</span>" }
+        points = ap ? "<span>#{ap[0]} / #{ap[1]} AP</span>" : ""
+        "<div class=\"ability\" style=\"--c:#{ABILITY_COLORS.fetch(id, 'var(--muted)')}\">" \
+          "<div class=\"ability-head\"><b>#{Text.game(name)}</b>#{points}</div><div class=\"chips\">#{chips.join}</div></div>"
+      end
+      blocks.empty? ? "" : "<h4>Abilities</h4><div class=\"abilities\">#{blocks.join}</div>"
+    end
+
+    # @param actor [Game_Actor] the member
+    # @return [String] her Proof Abilities, which cost no AP, in columns split by lines, "" when she
+    #   has none
+    def self.proof_list(actor)
+      Party.abilities(actor).reject { |row| row[3] }.map do |_, name, skills, _|
+        rows = skills.map { |skill| "<span>#{icon(skill.icon_index)}#{Text.game(skill.name)}</span>" }
+        "<h4>#{Text.game(name)}<b>#{skills.size}</b></h4><div class=\"proofs\">#{rows.join}</div>"
+      end.join
+    end
+
+    # @param label [String] the list's name
+    # @param resists [Array<Array(Integer, String, String, Symbol)>] the icon, name, resist and its
+    #   kind of each element or state
+    # @return [String] every resist, with the number of those that differ from 100% by the name
+    def self.resist_list(label, resists)
+      changed = resists.count { |row| row[3] != :normal }
+      "<h4>#{label}<b>#{changed}</b></h4><dl class=\"resists\">#{resist_rows(resists)}</dl>"
+    end
+
+    # Category of the skill types in the effects of a member's image, shown first.
+    SKILL_TYPES = "Skill Types"
+
+    # @param actor [Game_Actor] the member
+    # @return [String] the skill types she can use, sealed ones struck through, followed by her
+    #   effects with the value their sources add up to and how often the game applies one it applies
+    #   one by one, by category, "" without either
+    def self.effect_list(actor)
+      skill_types = Party.skill_types(actor).map do |name, sealed|
+        [SKILL_TYPES, "<span#{sealed ? ' class="sealed"' : ''}>#{Text.game(name)}</span>"]
+      end
+      effects = Party.effects(actor).map do |category, name, _, times|
+        [category, "<span>#{Text.game(name)}#{times > 1 ? " <i>&times;#{times}</i>" : ''}</span>"]
+      end
+      categories("Effects", skill_types + effects, [SKILL_TYPES] + Combine::CATEGORY_ORDER, effects.size)
+    end
+
+    # Splits a weapon boost's name into the weapon it needs and the boost, like "Scalpel Equipped"
+    # and "Dagger Booster 50%".
+    WEAPON_BOOST = /\A([^:：]+)[:：]\s*(.+)\z/
+
+    # @param actor [Game_Actor] the member
+    # @return [String] her boosts with the value their sources add up to, by category, the weapon
+    #   boosts in a box per weapon they need, "" without any
+    def self.boost_list(actor)
+      boosts = Party.boosts(actor).map { |category, name, _| [category, Text.plain(name)] }
+      weapon, others = boosts.partition { |category, text| category == "Weapon" && text =~ WEAPON_BOOST }
+
+      chips = others.map { |category, text| [category, "<span>#{Text.html(text)}</span>"] }
+      weapon.group_by { |_, text| text[WEAPON_BOOST, 1] }.each do |needed, group|
+        inner = group.map { |_, text| "<span>#{Text.html(text[WEAPON_BOOST, 2])}</span>" }.join
+        chips << ["Weapon", "<div class=\"needs\"><b>#{Text.html(needed)}</b><div class=\"chips\">#{inner}</div></div>"]
+      end
+      categories("Boosts", chips, Combine::BOOST_ORDER, boosts.size)
+    end
+
+    # @param label [String] the list's name
+    # @param chips [Array<Array(String, String)>] each chip's category and HTML
+    # @param order [Array<String>] the categories in the order they show
+    # @param count [Integer] the number shown by the name
+    # @return [String] a row per category with its chips, "" without chips
+    def self.categories(label, chips, order, count = chips.size)
+      return "" if chips.empty?
+
+      groups = chips.group_by(&:first)
+      rows = order.select { |category| groups[category] }.map do |category|
+        "<div class=\"cat\"><span>#{Text.html(category)}</span><div class=\"chips\">#{groups[category].map(&:last).join}</div></div>"
+      end
+      "<h4>#{label}<b>#{count}</b></h4><div class=\"cats\">#{rows.join}</div>"
+    end
+
+    # @param actor [Game_Actor] the member
+    # @return [String] the jobs and the races of the highest rank she has levels in, each with her
+    #   level, under the job change screen's name for the rank, like Sealed Jobs
+    def self.top_ranks(actor)
+      [["Jobs", :job?, 0], ["Races", :tribe?, 1]].map do |label, kind, type|
+        rank, classes = Party.top_rank(actor, kind)
+        next "" if classes.empty?
+
+        rows = classes.map do |data|
+          level = actor.level_list[data.id].to_i
+          mastered = level >= data.max_lv
+          "<div class=\"level#{mastered ? ' mastered' : ''}\"><span>#{Text.game(data.name)}</span>" \
+            "<b>#{level} / #{data.max_lv}#{mastered ? ' &#9733;' : ''}</b></div>"
+        end
+        "<h4>#{Text.game(Party.ranks(type).fetch(rank, label))}<b>#{classes.size}</b></h4><div class=\"levels\">#{rows.join}</div>"
+      end.join
+    end
+
     # Follows STYLE, whose rules the palette's own ones override.
     #
     # @return [String] the colours the Theme option picks, DARK when they cannot be told
@@ -1841,13 +2138,15 @@ body{margin:0;background:var(--bg)}
        "<title>Party Sheet</title><style>#{style}</style></head>"].join("\n")
     end
 
-    # @return [String] the title and the facts about the save
+    # @return [String] the title and the facts about the save, each left out on its own when the
+    #   game cannot tell it
     def self.header
-      facts = [["Play Time", Text.html($game_system.playtime_s)],
-               ["Gold", "#{Text.large($game_party.gold)} #{Text.html(Vocab.currency_unit)}"],
-               ["Location", Text.game(Party.location)],
-               ["Party", Text.number($game_party.all_members.size)]]
-      items = facts.reject { |_, value| value.strip.empty? }
+      facts = [["Play Time", proc { Text.html($game_system.playtime_s) }],
+               ["Gold", proc { "#{Text.large($game_party.gold)} #{Text.html(Vocab.currency_unit)}" }],
+               ["Location", proc { Text.game(Party.location) }],
+               ["Party", proc { Text.number($game_party.all_members.size) }]]
+      items = facts.map { |label, value| [label, MGQ_PartySheet.safely(label.downcase) { value.call }] }
+                   .reject { |_, value| value.strip.empty? }
                    .map { |label, value| "<li><span>#{label}</span>#{value}</li>" }
 
       '<header class="top"><h1>Party Sheet</h1><p>Monster Girl Quest! Paradox</p>' \
@@ -2095,12 +2394,17 @@ body{margin:0;background:var(--bg)}
     #   kind of each element or state
     # @return [String] every resist, folded away, counting the ones that differ from 100%
     def self.resists(label, resists)
-      rows = resists.map do |icon_index, name, text, kind|
-        "<div class=\"#{kind}\">#{icon(icon_index)}<dt>#{Text.game(name)}</dt><dd>#{text}</dd></div>"
-      end
       changed = resists.count { |row| row[3] != :normal }
+      folded(label, changed, "<dl class=\"resists\">#{resist_rows(resists)}</dl>", true)
+    end
 
-      folded(label, changed, "<dl class=\"resists\">#{rows.join}</dl>", true)
+    # @param resists [Array<Array(Integer, String, String, Symbol)>] the icon, name, resist and its
+    #   kind of each element or state
+    # @return [String] a row per resist, coloured by its kind
+    def self.resist_rows(resists)
+      resists.map do |icon_index, name, text, kind|
+        "<div class=\"#{kind}\">#{icon(icon_index)}<dt>#{Text.game(name)}</dt><dd>#{text}</dd></div>"
+      end.join
     end
 
     # @param actor [Game_Actor] the member

@@ -32,6 +32,19 @@ P also writes an image next to the page, like `05_party_sheet.png`: the Frontlin
 
 The image is taken by Microsoft Edge, or Google Chrome if Edge is missing, which runs in the background without a window. The game doesn't wait for it; the image appears a few seconds later.
 
+## Character image
+
+Press **P** while a character's status screen is open to write an image of that character alone, like `05_party_sheet_Alice.png` next to the other files. It holds everything the page shows of her, with no lists folded away:
+
+- her picture with her stats below it, her job and race, and her trait
+- her equipment with each item's effects and gems written out
+- her abilities
+- her element and status resists, and every job and race of the highest rank she has levels in, like her Forbidden Jobs, mastered or not, with her level in each
+- her Proof Abilities in columns across the whole width
+- her skill types, effects and boosts across the whole width, effects and boosts showing only the value everything adds up to. Weapon boosts sit in a box per weapon they need, like *Dagger Equipped* holding *Sword Booster 150%*.
+
+Like the Frontline image, it is taken by Edge or Chrome in the background and appears a few seconds later.
+
 ## Long lists in the game
 
 When a game's element resists, status resists or a trait run past the bottom of the status screen or the Library, they scroll with **S** and **D**, like the job menu of the newer English translation. Lists that fit show as before, so this only matters if you made a list longer. With the newer translation, the status screen uses that translation's own scroll bar; the Library keeps the character's picture in place while the list moves.
