@@ -39,7 +39,7 @@ Press **P** while a character's status screen is open to write an image of that 
 - her picture with her stats below it, her job and race, and her trait
 - her equipment with each item's effects and gems written out
 - her abilities
-- her element and status resists, and every job and race of the highest rank she has levels in, like her Forbidden Jobs, mastered or not, with her level in each
+- her resist lists, and every job and race of the highest rank she has levels in, like her Forbidden Jobs, mastered or not, with her level in each
 - her Proof Abilities in columns across the whole width
 - her skill types, effects and boosts across the whole width, effects and boosts showing only the value everything adds up to. Weapon boosts sit in a box per weapon they need, like *Dagger Equipped* holding *Sword Booster 150%*.
 

@@ -697,6 +697,25 @@ module MGQ_PartySheet
                    :equip_wtype_name, :equip_atype_name, :equip_fix_name, :equip_seal_name,
                    :equip_mastery_name, :collaplse_type_name, :dummy_enchant_name]
 
+    # Lists the resists an actor has with everything she wears, as the game's status screen shows
+    # them, lists a mod added there included. Without that screen, the element and status resists
+    # the game's own lists name.
+    #
+    # @param actor [Game_Actor] the actor
+    # @return [Array<Array(String, Array<Array(Integer, String, String, Symbol)>)>] each list's name
+    #   and its rows: the icon, name, resist and its kind
+    def self.resist_lists(actor)
+      lists = begin
+                StatusScreen.lists(actor)
+              rescue => e
+                MGQ_PartySheet.log("status screen of #{actor.name} not read: #{e.class}: #{e.message}")
+                nil
+              end
+      return lists if lists && !lists.empty?
+
+      [["Element Resists", element_resists(actor)], ["Status Resists", state_resists(actor)]]
+    end
+
     # Lists the element resists an actor has with everything she wears, as the game's status
     # screen shows them.
     #
@@ -1006,6 +1025,98 @@ module MGQ_PartySheet
       SIDES[switch]
     rescue
       nil
+    end
+  end
+
+  # Reads the lists the game's status screen shows under Basic Info, so a list a mod adds there
+  # shows on the sheet too. Each page is drawn in a window that is never shown, which only records
+  # what it would draw; pages drawn as rows of icon, name and value are the lists.
+  module StatusScreen
+    # Rows a page needs at least to count as a list.
+    MIN_ROWS = 2
+
+    # Values the status screen writes in place of a percentage, by their kind.
+    WORDS = { "NULL" => :null, "REFLECT" => :reflect, "ABSORB" => :absorb }
+
+    # Kinds of a value the status screen writes in words this mod does not know, by the colour
+    # method it draws them in.
+    COLORS = { :special_color => :null, :crisis_color => :absorb, :good_color => :good, :bad_color => :bad }
+
+    # @param actor [Game_Actor] the actor
+    # @return [Array<Array(String, Array<Array(Integer, String, String, Symbol)>)>, nil] each list's
+    #   page name and rows: the icon, name, value and its kind, nil without the game's status screen
+    def self.lists(actor)
+      return nil unless defined?(Foo::Status::Window_MainStatus)
+
+      window = Foo::Status::Window_MainStatus.new
+      window.visible = false
+      calls = record(window)
+      window.actor = actor
+      window.root_index = 0
+      names = window.data[0]
+      names.each_index.map do |index|
+        calls.clear
+        window.select(index)
+        rows = rows_of(window, calls)
+        rows.size >= MIN_ROWS ? [Text.plain(names[index]), rows] : nil
+      end.compact
+    ensure
+      window.dispose if window && !window.disposed?
+    end
+
+    # Makes a window record the icons and texts it draws instead of drawing them.
+    #
+    # @param window [Window_Base] the window
+    # @return [Array<Array>] the list the window records into: [:icon, icon, x, y] and
+    #   [:text, x, y, width, text, alignment, colour]
+    def self.record(window)
+      calls = []
+      window.define_singleton_method(:draw_icon) { |icon, x, y, *rest| calls << [:icon, icon, x.to_i, y.to_i] }
+      window.define_singleton_method(:draw_text) do |*args|
+        rect = args[0].is_a?(Rect) ? args.shift : Rect.new(*args.shift(4))
+        calls << [:text, rect.x.to_i, rect.y.to_i, rect.width.to_i, args[0].to_s, args[1] || 0, contents.font.color.dup]
+      end
+      calls
+    end
+
+    # Pairs each icon a page drew with the name written beside it and the value written at the
+    # right of the same line.
+    #
+    # @param window [Window_Base] the window that drew the page
+    # @param calls [Array<Array>] what it drew, see record
+    # @return [Array<Array(Integer, String, String, Symbol)>] the rows: icon, name, value and kind
+    def self.rows_of(window, calls)
+      texts = calls.select { |call| call[0] == :text }
+      calls.select { |call| call[0] == :icon }.map do |_, icon, x, y|
+        beside = texts.select { |text| text[2] == y && text[1] >= x && text[1] <= x + Images::ICON_SIZE * 2 }
+        name = beside.find { |text| text[5] != 2 }
+        value = beside.find { |text| text[5] == 2 }
+        next nil unless name && value
+
+        written = Text.plain(value[4])
+        [icon, Text.plain(name[4]), written, kind(window, written, value[6])]
+      end.compact
+    end
+
+    # @param window [Window_Base] the window that drew the value
+    # @param written [String] the value, like 50%, NULL or REFLECT
+    # @param color [Color] the colour it was drawn in
+    # @return [Symbol] whether it is :good, :bad, :normal, :null, :reflect or :absorb
+    def self.kind(window, written, color)
+      return WORDS[written] if WORDS.key?(written)
+
+      percent = written[/-?\d+/]
+      if percent
+        return :good if percent.to_i < 100
+        return :bad if percent.to_i > 100
+
+        return :normal
+      end
+      COLORS.each do |method, kind|
+        drawn = window.respond_to?(method) ? window.send(method) : nil
+        return kind if drawn && [:red, :green, :blue, :alpha].all? { |part| drawn.send(part) == color.send(part) }
+      end
+      :normal
     end
   end
 
@@ -2147,9 +2258,9 @@ body{margin:0;background:var(--bg)}
          panel { MGQ_PartySheet.safely("trait of #{name}") { trait(actor) } }],
         [panel { MGQ_PartySheet.safely("equipment of #{name}") { gear(actor) } }],
         [panel { MGQ_PartySheet.safely("abilities of #{name}") { ability_list(actor) } }],
-        [panel { MGQ_PartySheet.safely("element resists of #{name}") { resist_list("Element Resists", Party.element_resists(actor)) } },
-         panel { MGQ_PartySheet.safely("status resists of #{name}") { resist_list("Status Resists", Party.state_resists(actor)) } },
-         panel { MGQ_PartySheet.safely("rank of #{name}") { top_ranks(actor) } }],
+        Party.resist_lists(actor).map do |label, rows|
+          panel { MGQ_PartySheet.safely("#{label} of #{name}") { resist_list(label, rows) } }
+        end + [panel { MGQ_PartySheet.safely("rank of #{name}") { top_ranks(actor) } }],
       ]
       lists = [panel { MGQ_PartySheet.safely("proofs of #{name}") { proof_list(actor) } },
                panel { MGQ_PartySheet.safely("effects of #{name}") { effect_list(actor) } },
@@ -2597,8 +2708,10 @@ body{margin:0;background:var(--bg)}
     # @return [String] her resists, skill types, effects and boosts
     def self.applied(actor)
       name = actor.name
-      parts = [MGQ_PartySheet.safely("element resists of #{name}") { resists("Element Resists", Party.element_resists(actor)) },
-               MGQ_PartySheet.safely("status resists of #{name}") { resists("Status Resists", Party.state_resists(actor)) },
+      lists = Party.resist_lists(actor).map do |label, rows|
+        MGQ_PartySheet.safely("#{label} of #{name}") { resists(label, rows) }
+      end
+      parts = [lists.join,
                MGQ_PartySheet.safely("skill types of #{name}") { skill_types(actor) },
                MGQ_PartySheet.safely("effects of #{name}") { effects(actor) },
                MGQ_PartySheet.safely("boosts of #{name}") { boosts(actor) }].join
