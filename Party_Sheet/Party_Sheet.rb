@@ -1737,7 +1737,7 @@ if ($Shots) {
 --glow:#fff3cf;--halo:#fbecc0;--shade:rgba(255,253,248,.94);--name-shadow:0 1px 4px #fff;--chip:#efe4cb;--chip-text:#5a4d33;
 --trait:linear-gradient(135deg,#fbf2da,#f6ead0);--trait-text:#4d4330;--tip:rgba(255,253,248,.92);--shadow:rgba(120,95,40,.15);--tip-shadow:rgba(120,95,40,.25);
 --good:#2d8049;--bad:#c0392b;--reflect:#2a6db5;--absorb:#7c47bf}
-.abilities summary b,.ability-head b{color:color-mix(in srgb,var(--c) 65%,#000)}
+.abilities summary b,.ability-head b,.pool b{color:color-mix(in srgb,var(--c) 65%,#000)}
     CSS
 
     # Style of the page, in the colours of DARK or LIGHT. Paths inside are relative to the game
@@ -1880,6 +1880,10 @@ body{margin:0;background:var(--bg)}
 .needs{display:grid;align-content:start;gap:5px;width:calc(50% - 2px);padding:5px 8px 7px;border:1px solid var(--line);border-radius:8px;background:var(--tile)}
 .needs b{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--gold)}
 .needs .chips{margin:0}
+.pools{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+.pool{display:grid;align-content:start;gap:5px;min-width:260px;padding:6px 10px 8px;border-left:3px solid var(--c);border-radius:8px;background:color-mix(in srgb,var(--c) 10%,var(--tile))}
+.pool b{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--c)}
+.pool .chips{margin:0}
 .column{display:flex;flex-direction:column;gap:14px;min-width:0}
 .column>:last-child{flex:1}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 6px 18px var(--shadow)}
@@ -2092,18 +2096,35 @@ body{margin:0;background:var(--bg)}
     # Category of the skill types in the effects of a member's image, shown first.
     SKILL_TYPES = "Skill Types"
 
+    # Effect categories of HP, MP and SP, shown in boxes of their colour above the other categories.
+    POOLS = { "HP" => "#e5534b", "MP" => "#5b7cf0", "SP" => "#4cc46a" }
+
     # @param actor [Game_Actor] the member
-    # @return [String] the skill types she can use, sealed ones struck through, followed by her
-    #   effects with the value their sources add up to and how often the game applies one it applies
-    #   one by one, by category, "" without either
+    # @return [String] her HP, MP and SP effects in a box each, then the skill types she can use,
+    #   sealed ones struck through, and her other effects by category, each effect with the value
+    #   its sources add up to and how often the game applies one it applies one by one, "" without
+    #   any
     def self.effect_list(actor)
       skill_types = Party.skill_types(actor).map do |name, sealed|
         [SKILL_TYPES, "<span#{sealed ? ' class="sealed"' : ''}>#{Text.game(name)}</span>"]
       end
       effects = Party.effects(actor).map do |category, name, _, times|
-        [category, "<span>#{Text.game(name)}#{times > 1 ? " <i>&times;#{times}</i>" : ''}</span>"]
+        text = "#{Text.plain(name)}#{times > 1 ? " ×#{times}" : ''}"
+        [category, "<span>#{Text.game(name)}#{times > 1 ? " <i>&times;#{times}</i>" : ''}</span>", text.size]
       end
-      categories("Effects", skill_types + effects, [SKILL_TYPES] + Combine::CATEGORY_ORDER, effects.size)
+      pools, others = effects.partition { |category, _, _| POOLS.key?(category) }
+
+      boxes = POOLS.map do |category, color|
+        group = pools.select { |entry| entry[0] == category }
+        next "" if group.empty?
+
+        weight = group.map(&:last).inject(0, :+)
+        "<div class=\"pool\" style=\"--c:#{color};flex:#{weight} 1 0\"><b>#{category}</b>" \
+          "<div class=\"chips\">#{group.map { |entry| entry[1] }.join}</div></div>"
+      end.join
+      head = boxes.empty? ? "" : "<div class=\"pools\">#{boxes}</div>"
+      chips = skill_types + others.map { |category, chip, _| [category, chip] }
+      categories("Effects", chips, [SKILL_TYPES] + Combine::CATEGORY_ORDER, effects.size, head)
     end
 
     # Splits a weapon boost's name into the weapon it needs and the boost, like "Scalpel Equipped"
@@ -2129,15 +2150,16 @@ body{margin:0;background:var(--bg)}
     # @param chips [Array<Array(String, String)>] each chip's category and HTML
     # @param order [Array<String>] the categories in the order they show
     # @param count [Integer] the number shown by the name
+    # @param head [String] what comes between the name and the rows, "" for nothing
     # @return [String] a row per category with its chips, "" without chips
-    def self.categories(label, chips, order, count = chips.size)
-      return "" if chips.empty?
+    def self.categories(label, chips, order, count = chips.size, head = "")
+      return "" if chips.empty? && head.empty?
 
       groups = chips.group_by(&:first)
       rows = order.select { |category| groups[category] }.map do |category|
         "<div class=\"cat\"><span>#{Text.html(category)}</span><div class=\"chips\">#{groups[category].map(&:last).join}</div></div>"
       end
-      "<h4>#{label}<b>#{count}</b></h4><div class=\"cats\">#{rows.join}</div>"
+      "<h4>#{label}<b>#{count}</b></h4>#{head}<div class=\"cats\">#{rows.join}</div>"
     end
 
     # @param actor [Game_Actor] the member
