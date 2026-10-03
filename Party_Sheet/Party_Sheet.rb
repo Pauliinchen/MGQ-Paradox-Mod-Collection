@@ -958,7 +958,7 @@ module MGQ_PartySheet
       ["Wielding",     :FEATURE_SLOT_TYPE,       nil,      nil],
       ["SP",           :FEATURE_BATTLER_ABILITY, :Battler, :TP_COST_RATE],
       ["SP",           :FEATURE_BATTLER_ABILITY, :Battler, :INCREASE_TP],
-      ["SP",           :FEATURE_BATTLER_ABILITY, :Battler, :START_TP_RATE],
+      ["Battle Start", :FEATURE_BATTLER_ABILITY, :Battler, :START_TP_RATE],
       ["SP",           :FEATURE_SPECIAL_FLAG,    nil,      :PRESERVE_TP],
       ["MP",           :FEATURE_BATTLER_ABILITY, :Battler, :DAMAGE_MP_CONVERT],
       ["MP",           :FEATURE_BATTLER_ABILITY, :Battler, :DAMAGE_MP_DRAIN],
