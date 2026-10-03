@@ -2,6 +2,7 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-03: Wrote the sheet in game folders with Japanese or other non-ASCII names
 #      Paulinchen  2026-09-29: Ignored the hotkey while another mod takes typed text
 #      Paulinchen  2026-09-28: Replaced the F7 key with a Hotkey option that picks among keys the game leaves free.
 #      Paulinchen  2026-09-27: Added a Theme option that makes the page white and gold for Ilias, dark and purple for Alice.
@@ -104,12 +105,12 @@ module MGQ_PartySheet
   #
   # Asked of Windows, the working directory is wherever a shortcut or Steam started the game.
   #
-  # @return [String] the folder, with forward slashes
+  # @return [String] the folder in UTF-8, with forward slashes
   def self.game_dir
     @game_dir ||= begin
-      buffer = "\0" * 512
-      length = Win32API.new('kernel32', 'GetModuleFileNameA', 'lpl', 'l').call(0, buffer, 512)
-      File.dirname(buffer[0, length].tr("\\", "/"))
+      buffer = Wide.buffer(Wide::MAX_CHARS)
+      length = Win32API.new('kernel32', 'GetModuleFileNameW', 'lpl', 'l').call(0, buffer, Wide::MAX_CHARS)
+      File.dirname(Wide.text(buffer, length).tr("\\", "/"))
     end
   rescue
     @game_dir = Dir.pwd
@@ -124,6 +125,45 @@ module MGQ_PartySheet
 
     File.open(path(LOG_FILE), "ab") { |file| file.write("#{Time.now}  #{message}\n") }
   rescue
+  end
+
+  # Passes text to and from Windows in UTF-16.
+  #
+  # The functions ending in A use the system's code page, which turns a Japanese folder into
+  # Shift-JIS bytes or question marks that Ruby's UTF-8 paths cannot open.
+  module Wide
+    # Characters a buffer holds, enough for any path or environment variable the sheet reads.
+    MAX_CHARS = 1024
+
+    # @param text [String] text in UTF-8
+    # @return [String] the text in UTF-16LE with its terminating zero, as Win32API passes it
+    def self.string(text)
+      "#{text}\0".encode("UTF-16LE").force_encoding("ASCII-8BIT")
+    end
+
+    # @param chars [Integer] how many characters the buffer holds
+    # @return [String] a buffer Windows writes UTF-16LE into
+    def self.buffer(chars)
+      ("\0\0" * chars).force_encoding("ASCII-8BIT")
+    end
+
+    # @param buffer [String] a buffer Windows wrote into
+    # @param chars [Integer] how many characters it wrote
+    # @return [String] those characters in UTF-8
+    def self.text(buffer, chars)
+      buffer[0, chars * 2].force_encoding("UTF-16LE").encode("UTF-8")
+    end
+
+    # Reads an environment variable, which ENV hands over in the system's code page.
+    #
+    # @param name [String] the variable
+    # @return [String, nil] its value in UTF-8, nil when it is not set
+    def self.env(name)
+      buffer = buffer(MAX_CHARS)
+      @get_env ||= Win32API.new('kernel32', 'GetEnvironmentVariableW', 'ppl', 'l')
+      length = @get_env.call(string(name), buffer, MAX_CHARS)
+      length > 0 && length < MAX_CHARS ? text(buffer, length) : nil
+    end
   end
 
   # Reads keys from Windows, as the game's Input knows little more than its buttons and the F keys.
@@ -1251,7 +1291,8 @@ if ($Frontline) {
       File.open(work_path(FRONTLINE_FILE), "wb") { |file| file.write(Page.frontline(base)) } if image
       File.open(work_path(SCRIPT_FILE), "wb") { |file| file.write(SCRIPT) }
 
-      result = shell_execute.call(0, "open", "powershell.exe", arguments(convert, image), windows_path(MGQ_PartySheet.game_dir), 0)
+      result = shell_execute.call(0, Wide.string("open"), Wide.string("powershell.exe"), Wide.string(arguments(convert, image)),
+                                  Wide.string(windows_path(MGQ_PartySheet.game_dir)), 0)
       MGQ_PartySheet.log("could not start PowerShell: error #{result}") if result <= 32
     end
 
@@ -1289,7 +1330,7 @@ if ($Frontline) {
     # @param name [String] a file name inside WORK_DIR, "" for the folder itself
     # @return [String] its full path
     def self.work_path(name)
-      "#{ENV['TEMP'].tr("\\", "/")}/#{WORK_DIR}/#{name}".chomp("/")
+      "#{Wide.env('TEMP').tr("\\", "/")}/#{WORK_DIR}/#{name}".chomp("/")
     end
 
     # @param path [String] a path with forward slashes
@@ -1308,7 +1349,7 @@ if ($Frontline) {
       return @browser if @searched
 
       @searched = true
-      folders = ["ProgramFiles(x86)", "ProgramW6432", "ProgramFiles", "LOCALAPPDATA"].map { |name| ENV[name] }.compact
+      folders = ["ProgramFiles(x86)", "ProgramW6432", "ProgramFiles", "LOCALAPPDATA"].map { |name| Wide.env(name) }.compact
       @browser = BROWSERS.map { |program| folders.map { |folder| "#{folder}/#{program}" } }.flatten
                          .find { |path| File.exist?(path) }
     end
@@ -1319,9 +1360,9 @@ if ($Frontline) {
       path.tr("/", "\\")
     end
 
-    # @return [Win32API] ShellExecuteA, which starts a program without waiting for it
+    # @return [Win32API] ShellExecuteW, which starts a program without waiting for it
     def self.shell_execute
-      @shell_execute ||= Win32API.new('shell32', 'ShellExecuteA', 'lppppl', 'l')
+      @shell_execute ||= Win32API.new('shell32', 'ShellExecuteW', 'lppppl', 'l')
     end
   end
 
