@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Wrote the sheet into Party sheets, named after the save the party is in
+#      Paulinchen  2026-10-03: Read the side chosen in the untranslated game too
+#                            - Wrote the sheet into Party sheets, named after the save the party is in
 #                            - Wrote the sheet in game folders with Japanese or other non-ASCII names
 #      Paulinchen  2026-09-29: Ignored the hotkey while another mod takes typed text
 #      Paulinchen  2026-09-28: Replaced the F7 key with a Hotkey option that picks among keys the game leaves free.
@@ -726,8 +727,9 @@ module MGQ_PartySheet
       ""
     end
 
-    # Side chosen, by the name in the editor of the switch that records the choice.
-    SIDES = { "Ilias Chosen" => :ilias, "Alice Chosen" => :alice }
+    # Side chosen, by the name in the editor of the switch that records the choice, in the
+    # translation and in the untranslated game.
+    SIDES = { "Ilias Chosen" => :ilias, "イリアス選択" => :ilias, "Alice Chosen" => :alice, "アリス選択" => :alice }
 
     # Reads the switches by their names, so no id is hard-coded.
     #

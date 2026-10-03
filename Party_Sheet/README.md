@@ -62,7 +62,7 @@ If something is missing from the page or no image appears, `Party Sheet.log` in 
 
 ## Compatibility
 
-Tested on 3.06 with the English translation.
+Tested on 3.06 with and without the English translation. Without it, the sheet shows the game's Japanese names and descriptions. It also works in game folders with Japanese names.
 
 The pictures need the game's graphics as loose files in its `Graphics` folder. With the graphics still packed in `Game.rgss3a`, the cards show the character's face instead.
 
