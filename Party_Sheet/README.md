@@ -10,7 +10,7 @@ Each save gets its own sheet, named after the save you last loaded or saved to: 
 
 - **Picture** from the Library, with name and level.
 - **Job and race** with their levels; a star marks a mastered one.
-- **Stats**, with large numbers shortened the way the game's status screen does, like `12.346Mil.`. Hover a stat for its exact value.
+- **Stats**, Max HP, MP and SP included, with large numbers shortened the way the game's status screen does, like `12.346Mil.`. Hover a stat for its exact value.
 - **Equipment**, with the icons of the gems in each item's sockets next to its name.
 - **Abilities** equipped, per category in the colours of their icons in the ability screen, with the AP they use. Proof Abilities show up once you have them.
 - **Trait** with its description.

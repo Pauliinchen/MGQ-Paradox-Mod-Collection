@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Wrote an image of everything about the member the status screen shows at the hotkey
+#      Paulinchen  2026-10-03: Added Max SP to the stats, three to a row
+#                            - Wrote an image of everything about the member the status screen shows at the hotkey
 #                            - Let resists and traits too long for the status screen and the Library scroll
 #                            - Made Hotkey a key binding that takes the next key pressed in Mod Config Remake
 #                            - Listed a key bound there in older menus, whose list lacked it
@@ -1690,8 +1691,9 @@ if ($Shots) {
     # loads from the internet, whatever the page holds.
     POLICY = "default-src 'none'; style-src 'unsafe-inline'; img-src data:#{EMBED_IMAGES ? '' : ' file:'}; " \
              "base-uri 'none'; form-action 'none'"
-    # Stats shown as tiles, by the method that reads them and their name on the status screen.
-    STATS = [[:mhp, "Max HP"], [:mmp, "Max MP"], [:atk, "Attack"], [:def, "Defense"],
+    # Stats shown as tiles, three to a row, by the method that reads them and their name on the
+    # status screen. Max SP is the game's TP.
+    STATS = [[:mhp, "Max HP"], [:mmp, "Max MP"], [:max_tp, "Max SP"], [:atk, "Attack"], [:def, "Defense"],
              [:mat, "Magic"], [:mdf, "Willpower"], [:agi, "Agility"], [:luk, "Dexterity"]]
 
     # Rates shown below the tiles, by the method that reads them and their name on the status screen.
@@ -1749,7 +1751,7 @@ body{margin:0;background:radial-gradient(1200px 600px at 50% -200px,var(--glow),
 .class .level{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .class.mastered .level{color:var(--gold)}
 h4{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .stat{background:var(--tile);border-radius:8px;padding:6px 8px;min-width:0}
 .stat span{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stat b{display:block;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1807,7 +1809,7 @@ details.category summary{font-size:11px;text-transform:uppercase;letter-spacing:
 .chips>span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px}
 .none{margin-top:8px;font-size:13px;color:var(--muted)}
 footer{margin-top:40px;font-size:12px;text-align:center;color:var(--muted)}
-@media (max-width:440px){.party{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.rates{grid-template-columns:1fr}}
+@media (max-width:440px){.party{grid-template-columns:1fr}.rates{grid-template-columns:1fr}}
     CSS
 
     # Style that leaves the folded lists out and fits a card into a narrower column, for printing
@@ -1817,10 +1819,8 @@ footer{margin-top:40px;font-size:12px;text-align:center;color:var(--muted)}
 .card{box-shadow:none}
 .portrait{aspect-ratio:16/10}
 .portrait img{object-fit:cover;object-position:50% 15%}
-.stats{grid-template-columns:1fr 1fr}
-.stat{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:3px 8px}
-.stat span{font-size:12px}
-.stat b{font-size:13px}
+.stat{padding:4px 8px}
+.stat b{font-size:14px}
 details,.applied,.abilities,.none{display:none}
     CSS
 
@@ -2244,7 +2244,7 @@ body{margin:0;background:var(--bg)}
     # @param actor [Game_Actor] the member
     # @return [String] her stats as tiles and her rates below them
     def self.stats(actor)
-      tiles = STATS.map do |method, label|
+      tiles = STATS.select { |method, _| actor.respond_to?(method) }.map do |method, label|
         value = actor.send(method)
         "<div class=\"stat\" title=\"#{label}: #{Text.number(value)}\"><span>#{label}</span><b>#{Text.large(value)}</b></div>"
       end
