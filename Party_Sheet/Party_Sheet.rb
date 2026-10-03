@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Made Hotkey a key binding that takes the next key pressed in Mod Config Remake
+#      Paulinchen  2026-10-03: Let resists and traits too long for the status screen and the Library scroll
+#                            - Made Hotkey a key binding that takes the next key pressed in Mod Config Remake
 #                            - Listed a key bound there in older menus, whose list lacked it
 #                            - Read the side chosen in the untranslated game too
 #                            - Wrote the sheet into Party sheets, named after the save the party is in
@@ -46,6 +47,10 @@ module MGQ_PartySheet
 
   # Lines logged per session at most, a part missing from the game would be logged at every write.
   MAX_LOG_LINES = 60
+
+  # Whether resists and traits that run past the bottom of the status screen and the Library
+  # scroll with S and D.
+  SCROLL_LISTS = true
 
   # Reports whether the hooks can be installed.
   #
@@ -2166,6 +2171,342 @@ body{margin:0;background:var(--bg)}
       "-#{index % per_row * size}px -#{index / per_row * size}px"
     end
   end
+
+  # Lets lists that run past the bottom of the status screen and the Library scroll with S and D,
+  # the game's Y and Z buttons, as the translation's job menu does: element and status resists and
+  # traits. A list that fits shows as before.
+  module Scrolling
+    # Pixels a list moves per frame while its key is held.
+    SPEED = 6
+
+    # Height of the bitmap a list is first drawn into, to measure it.
+    DRAW_HEIGHT = 2048
+
+    # Height the Library keeps free at its bottom, where it writes the artist.
+    LIBRARY_FOOTER = 24
+
+    # Width of the scroll bar, and the colours of its thumb, its track and the arrows.
+    BAR_WIDTH = 5
+    BAR_COLOR = Color.new(255, 255, 255, 120)
+    TRACK_COLOR = Color.new(255, 255, 255, 30)
+    ARROW_COLOR = Color.new(255, 255, 255, 160)
+
+    # Methods of the status screen that draw a list from (x, y) to the bottom of the window.
+    STATUS_LISTS = [:element_resist_refresh, :state_resist_refresh, :fix_ability_refresh]
+
+    # Methods of the Library that draw a list from y to the bottom of the window.
+    LIBRARY_LISTS = [:draw_element_resists, :draw_enemy_statresist, :draw_actor_fix_ability]
+
+    # Wraps the windows' methods, once.
+    #
+    # The translation's plugins load after the Patch folder and replace some of these methods, so
+    # this runs once the game starts.
+    def self.install
+      return if @installed
+
+      @installed = true
+      install_status if defined?(Foo::Status::Window_MainStatus)
+      install_library if defined?(Window_Library_RightMain)
+    rescue => e
+      MGQ_PartySheet.log("scrolling lists left out: #{e.class}: #{e.message}")
+    end
+
+    # Scrolls the status screen's lists with PluginFramework when the translation has it.
+    def self.install_status
+      window = Foo::Status::Window_MainStatus
+      window.send(:include, ScrollFramework::ScrollableGrid) if defined?(ScrollFramework::ScrollableGrid)
+
+      STATUS_LISTS.each do |name|
+        wrap(window, name) do |args, draw|
+          x, y = args
+          Scrolling.list(self, Rect.new(x, y, contents.width - x, contents.height - y), false, &draw)
+        end
+      end
+      wrap_refresh_and_dispose(window)
+      wrap(window, :update) do |args, original|
+        result = original.call
+        scroller = Scrolling.scroller(self)
+        scroller.update if scroller
+        result
+      end
+    end
+
+    # Scrolls the Library's lists with the keys that scroll its descriptions.
+    #
+    # The character's picture lies under the list, which PluginFramework would clear.
+    def self.install_library
+      window = Window_Library_RightMain
+
+      LIBRARY_LISTS.each do |name|
+        wrap(window, name) do |args, draw|
+          y = args[0]
+          Scrolling.list(self, Rect.new(0, y, contents.width, contents.height - LIBRARY_FOOTER - y), true, &draw)
+        end
+      end
+      wrap_refresh_and_dispose(window)
+      [[:scroll_down, 1], [:scroll_up, -1]].each do |name, direction|
+        wrap(window, name) do |args, original|
+          scroller = Scrolling.scroller(self)
+          scroller ? scroller.scroll(direction) : original.call
+        end
+      end
+    end
+
+    # Drops a window's list whenever it draws anew or closes.
+    #
+    # @param klass [Class] the window's class
+    def self.wrap_refresh_and_dispose(klass)
+      [:refresh, :dispose].each do |name|
+        wrap(klass, name) do |args, original|
+          Scrolling.stop(self)
+          original.call
+        end
+      end
+    end
+
+    # Runs a hook in place of a method, which it can call. Leaves out a method the game lacks.
+    #
+    # @param klass [Class] the class
+    # @param name [Symbol] the method
+    # @yieldparam args [Array] the method's arguments
+    # @yieldparam original [Proc] calls the method with them
+    # @yieldreturn [Object] what the method returns
+    def self.wrap(klass, name, &hook)
+      original = :"mgq_party_sheet_scrolling_#{name}"
+      return if !klass.method_defined?(name) || klass.method_defined?(original)
+
+      klass.send(:alias_method, original, name)
+      klass.send(:define_method, name) do |*args|
+        instance_exec(args, proc { send(original, *args) }, &hook)
+      end
+    end
+
+    # Draws a list, scrolling it when it runs past the bottom of its area.
+    #
+    # It is drawn into a tall bitmap first, which tells how long it is. A list that fits is drawn
+    # again in the window, as the game draws it.
+    #
+    # @param window [Window_Base] the window
+    # @param area [Rect] where the list shows in the window's contents
+    # @param backdrop [Boolean] whether a picture lies under the list, which stays in place
+    # @yieldreturn [Object] what the method that draws the list returns
+    # @return [Object] that
+    def self.list(window, area, backdrop)
+      return yield if area.height <= 0
+
+      shown = window.contents
+      tall = Bitmap.new(shown.width, DRAW_HEIGHT)
+      watch(tall)
+      copy_font(shown.font, tall.font)
+      window.contents = tall
+      begin
+        result = yield
+      ensure
+        window.contents = shown
+      end
+
+      height = [tall.mgq_bottom.to_i, DRAW_HEIGHT].min - area.y
+      if height <= area.height
+        tall.dispose
+        return yield
+      end
+
+      list = Bitmap.new(area.width, height)
+      list.blt(0, 0, tall, Rect.new(area.x, area.y, area.width, height))
+      tall.dispose
+      framework = !backdrop && window.respond_to?(:scroll_blit)
+      start(window, framework ? FrameworkScroller.new(window, area, list) : Scroller.new(window, area, list, backdrop))
+      result
+    rescue
+      tall.dispose if tall && !tall.disposed?
+      raise
+    end
+
+    # Makes a bitmap remember how far down anything was drawn on it, in mgq_bottom.
+    #
+    # @param bitmap [Bitmap] the bitmap
+    def self.watch(bitmap)
+      class << bitmap
+        attr_reader :mgq_bottom
+
+        def mgq_reach(y, height)
+          @mgq_bottom = [@mgq_bottom.to_i, (y + height).to_i].max
+        end
+
+        def draw_text(*args)
+          args[0].is_a?(Rect) ? mgq_reach(args[0].y, args[0].height) : mgq_reach(args[1], args[3])
+          super
+        end
+
+        def blt(x, y, source, rect, *rest)
+          mgq_reach(y, rect.height)
+          super
+        end
+
+        def stretch_blt(destination, *rest)
+          mgq_reach(destination.y, destination.height)
+          super
+        end
+
+        def fill_rect(*args)
+          args[0].is_a?(Rect) ? mgq_reach(args[0].y, args[0].height) : mgq_reach(args[1], args[3])
+          super
+        end
+
+        def gradient_fill_rect(*args)
+          args[0].is_a?(Rect) ? mgq_reach(args[0].y, args[0].height) : mgq_reach(args[1], args[3])
+          super
+        end
+      end
+    end
+
+    # @param from [Font] the font of the window's contents
+    # @param to [Font] the font of the bitmap a list is drawn into
+    def self.copy_font(from, to)
+      [:name, :size, :bold, :italic, :outline, :shadow].each { |name| to.send("#{name}=", from.send(name)) }
+      to.color.set(from.color)
+      to.out_color.set(from.out_color)
+    end
+
+    # @param window [Window_Base] the window
+    # @return [Scroller, FrameworkScroller, nil] the list it scrolls, nil for none
+    def self.scroller(window)
+      window.instance_variable_get(:@mgq_party_sheet_scroller)
+    end
+
+    # @param window [Window_Base] the window
+    # @param scroller [Scroller, FrameworkScroller] the list it scrolls from now on
+    def self.start(window, scroller)
+      stop(window)
+      window.instance_variable_set(:@mgq_party_sheet_scroller, scroller)
+    end
+
+    # @param window [Window_Base] the window, which scrolls no list afterwards
+    def self.stop(window)
+      scroller = scroller(window)
+      scroller.dispose if scroller
+      window.instance_variable_set(:@mgq_party_sheet_scroller, nil)
+    end
+
+    # Shows a long list in its area, with a scroll bar and arrows, and keeps the picture under it.
+    class Scroller
+      # @param window [Window_Base] the window
+      # @param area [Rect] where the list shows in the window's contents
+      # @param list [Bitmap] the whole list, which the scroller disposes
+      # @param backdrop [Boolean] whether to keep what the area shows now under the list
+      def initialize(window, area, list, backdrop)
+        @window = window
+        @area = area
+        @list = list
+        @y = 0
+        @max = list.height - area.height
+        if backdrop
+          @backdrop = Bitmap.new(area.width, area.height)
+          @backdrop.blt(0, 0, window.contents, area)
+        end
+        draw
+      end
+
+      # Moves the list while S or D is held. Called once per frame.
+      def update
+        scroll(Input.press?(:Z) ? 1 : Input.press?(:Y) ? -1 : 0)
+      end
+
+      # @param direction [Integer] 1 to move the list up and show more below, -1 back, 0 to stay
+      def scroll(direction)
+        y = [[@y + direction * SPEED, 0].max, @max].min
+        return if y == @y
+
+        @y = y
+        draw
+      end
+
+      # Frees the list and the picture kept.
+      def dispose
+        @list.dispose
+        @backdrop.dispose if @backdrop
+      end
+
+      private
+
+      # Draws the part of the list the area shows, over the picture kept.
+      def draw
+        contents = @window.contents
+        contents.clear_rect(@area)
+        contents.blt(@area.x, @area.y, @backdrop, @backdrop.rect) if @backdrop
+        contents.blt(@area.x, @area.y, @list, Rect.new(0, @y, @area.width, @area.height))
+        draw_bar(contents)
+      end
+
+      # Draws the bar at the area's right edge, and an arrow where more of the list lies.
+      #
+      # @param contents [Bitmap] the window's contents
+      def draw_bar(contents)
+        x = @area.x + @area.width - BAR_WIDTH
+        thumb = [@area.height * @area.height / @list.height, 8].max
+        contents.fill_rect(x, @area.y, BAR_WIDTH, @area.height, TRACK_COLOR)
+        contents.fill_rect(x, @area.y + (@area.height - thumb) * @y / @max, BAR_WIDTH, thumb, BAR_COLOR)
+
+        center = @area.x + @area.width / 2
+        draw_arrow(contents, center, @area.y + 4, true) if @y > 0
+        draw_arrow(contents, center, @area.y + @area.height - 8, false) if @y < @max
+      end
+
+      # @param contents [Bitmap] the window's contents
+      # @param center [Integer] the arrow's middle
+      # @param y [Integer] its top
+      # @param up [Boolean] whether it points up
+      def draw_arrow(contents, center, y, up)
+        4.times do |row|
+          width = (up ? row : 3 - row) * 2 + 1
+          contents.fill_rect(center - width / 2, y + row, width, 1, ARROW_COLOR)
+        end
+      end
+    end
+
+    # Shows a long list with the translation's PluginFramework, which the job menu scrolls with, so
+    # both look and move alike.
+    class FrameworkScroller
+      # @param window [Window_Base] the window, which includes ScrollFramework::ScrollableGrid
+      # @param area [Rect] where the list shows in the window's contents
+      # @param list [Bitmap] the whole list, which the scroller disposes
+      def initialize(window, area, list)
+        @window = window
+        @list = list
+        window.instance_eval do
+          scroll_init
+          @scroll_up_keys = [:Y]
+          @scroll_down_keys = [:Z]
+          @scroll_bitmap = list
+          @scroll_rx = area.x
+          @scroll_rw = area.width
+          @scroll_top_y = area.y
+          @scroll_vis_h = area.height
+          @scroll_max = list.height - area.height
+          scroll_blit
+        end
+      end
+
+      # Moves the list while S or D is held, and fades the bar out. Called once per frame.
+      def update
+        fading = @fading
+        @fading = @window.instance_eval do
+          scroll_update
+          @scroll_bar_timer.to_i > 0
+        end
+        @window.scroll_blit if @fading || fading
+      end
+
+      # Frees the list and takes it out of the framework.
+      def dispose
+        @window.instance_eval do
+          @scroll_bitmap = nil
+          @scroll_rx = nil
+        end
+        @list.dispose
+      end
+    end
+  end
 end
 
 # Game hooks.
@@ -2220,6 +2561,20 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
     end
   rescue => e
     MGQ_PartySheet.log("save slot hooks FAILED: #{e.class}: #{e.message}")
+  end
+
+  # The translation's plugins load after the Patch folder, so the lists hook their windows once the
+  # game starts.
+  begin
+    class << SceneManager
+      alias mgq_party_sheet_run run
+      def run(*args)
+        MGQ_PartySheet::Scrolling.install if MGQ_PartySheet::SCROLL_LISTS
+        mgq_party_sheet_run(*args)
+      end
+    end
+  rescue => e
+    MGQ_PartySheet.log("scrolling hook FAILED: #{e.class}: #{e.message}")
   end
 
   # The config windows draw every option again after each change, so Shown Theme comes and goes

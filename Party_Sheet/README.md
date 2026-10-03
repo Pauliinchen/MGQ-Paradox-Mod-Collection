@@ -32,6 +32,10 @@ P also writes an image next to the page, like `05_party_sheet.png`: the Frontlin
 
 The image is taken by Microsoft Edge, or Google Chrome if Edge is missing, which runs in the background without a window. The game doesn't wait for it; the image appears a few seconds later.
 
+## Long lists in the game
+
+When a game's element resists, status resists or a trait run past the bottom of the status screen or the Library, they scroll with **S** and **D**, like the job menu of the newer English translation. Lists that fit show as before, so this only matters if you made a list longer. With the newer translation, the status screen uses that translation's own scroll bar; the Library keeps the character's picture in place while the list moves.
+
 ## Mod Config Menu
 
 With the Mod Config Menu installed, the options are there, otherwise at the end of the game's Config menu:
@@ -57,6 +61,7 @@ These are constants at the top of `Party_Sheet.rb`. Open it in any text editor t
 - `ENABLED`: turns the mod off without uninstalling it.
 - `EMBED_IMAGES`: set to `false` for a much smaller page that loads its images from the game folder instead. It then only works while it stays in the `Party sheets` folder.
 - `PORTRAIT_QUALITY`: the WebP quality of the portraits, from 0 to 1, `0.85` by default. Set it to `nil` to keep the game's PNGs.
+- `SCROLL_LISTS`: set to `false` to leave the status screen and the Library as the game draws them.
 
 If something is missing from the page or no image appears, `Party Sheet.log` in the game folder says why.
 
@@ -70,5 +75,8 @@ The mod replaces no game methods. It runs alongside these, leaving what they do 
 
 - `DataManager.save_game_without_rescue`, `DataManager.load_game_without_rescue` and `DataManager.setup_new_game`, to name the sheet after the save
 - `Scene_Base#update_basic`
+- `SceneManager.run`, to hook the windows below once the translation's plugins have loaded
+- The status screen's `element_resist_refresh`, `state_resist_refresh`, `fix_ability_refresh`, `refresh`, `update` and `dispose`
+- The Library's `draw_element_resists`, `draw_enemy_statresist`, `draw_actor_fix_ability`, `scroll_down`, `scroll_up`, `refresh` and `dispose`
 - `Scene_Config#start`
 - `Window_Config#refresh` and the Mod Config Menu's `Window_ModConfig#refresh`, to show Shown Theme only while Theme is Static
