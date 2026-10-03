@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Put each equipment slot of the character image in a box of its own
+#      Paulinchen  2026-10-03: Moved equipment slots of the character image into its third column while the equipment's is the tallest
+#                            - Put each equipment slot of the character image in a box of its own
 #                            - Added Max SP to the stats, three to a row
 #                            - Wrote an image of everything about the member the status screen shows at the hotkey
 #                            - Let resists and traits too long for the status screen and the Library scroll
@@ -1876,6 +1877,8 @@ body{margin:0;background:var(--bg)}
 .slot-box .item{display:flex;align-items:center;gap:8px;font-size:15px}
 .more{display:grid;gap:4px}
 .more>.chips{margin-top:0}
+.columns.measure{align-items:start}
+.columns.measure .column>:last-child{flex:none}
 .sheet .gem{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:0;font-size:12px;color:var(--muted)}
 .sheet .gem .icon{width:18px;height:18px}
 .sheet .gem .chips{margin:0}
@@ -1912,6 +1915,24 @@ body{margin:0;background:var(--bg)}
     # reads it.
     SIZE_SCRIPT = "<script>var box=document.querySelector('.shot').getBoundingClientRect();" \
                   "document.body.setAttribute('data-size',Math.ceil(box.width)+'x'+Math.ceil(box.height));</script>"
+
+    # Moves equipment slots of a member's image, from the bottom up, into an Equipment panel at the
+    # end of the third column while the equipment's column is the tallest and each move makes the
+    # image shorter. The columns are measured at their own heights, before their last panels
+    # stretch to the tallest.
+    ARRANGE_SCRIPT = "<script>(function(){var grid=document.querySelector('.columns');if(!grid)return;" \
+                     "var cols=grid.querySelectorAll('.column'),gear=document.querySelector('.gear');if(cols.length<4||!gear)return;" \
+                     "grid.classList.add('measure');" \
+                     "function h(c){return c.getBoundingClientRect().height;}" \
+                     "function tallest(){var m=0;for(var i=0;i<cols.length;i++)m=Math.max(m,h(cols[i]));return m;}" \
+                     "var panel=document.createElement('section'),list=document.createElement('div');" \
+                     "panel.className='panel';panel.innerHTML='<h4>Equipment</h4>';list.className='gear';panel.appendChild(list);" \
+                     "while(h(cols[1])>=tallest()){var boxes=gear.querySelectorAll('.slot-box');if(boxes.length<2)break;" \
+                     "var box=boxes[boxes.length-1],before=tallest();if(!panel.parentNode)cols[2].appendChild(panel);" \
+                     "list.insertBefore(box,list.firstChild);" \
+                     "if(tallest()>=before){gear.appendChild(box);break;}}" \
+                     "if(!list.firstChild&&panel.parentNode)panel.parentNode.removeChild(panel);" \
+                     "grid.classList.remove('measure');})();</script>"
 
     # The body is built before the head, which carries the icons the body shows.
     #
@@ -1980,7 +2001,7 @@ body{margin:0;background:var(--bg)}
              "<footer>Written by Party_Sheet.rb on #{Time.now.strftime('%Y-%m-%d %H:%M')}</footer></section>"
 
       base_tag = base ? "<base href=\"#{Text.html(base)}\">" : ""
-      [head("#{STYLE}#{CHARACTER}#{palette}#{SHOT}#{icon_style}", base_tag), '<body>', shot, SIZE_SCRIPT, '</body></html>'].join("\n")
+      [head("#{STYLE}#{CHARACTER}#{palette}#{SHOT}#{icon_style}", base_tag), '<body>', shot, ARRANGE_SCRIPT, SIZE_SCRIPT, '</body></html>'].join("\n")
     end
 
     # @yieldreturn [String] a part of a member's image
