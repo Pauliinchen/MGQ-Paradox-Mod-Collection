@@ -2,7 +2,9 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-03: Read the side chosen in the untranslated game too
+#      Paulinchen  2026-10-03: Made Hotkey a key binding that takes the next key pressed in Mod Config Remake
+#                            - Listed a key bound there in older menus, whose list lacked it
+#                            - Read the side chosen in the untranslated game too
 #                            - Wrote the sheet into Party sheets, named after the save the party is in
 #                            - Wrote the sheet in game folders with Japanese or other non-ASCII names
 #      Paulinchen  2026-09-29: Ignored the hotkey while another mod takes typed text
@@ -224,6 +226,22 @@ module MGQ_PartySheet
       pressed && !$mgq_text_input && game_in_front?
     end
 
+    # Keys whose name Windows only gives with the extended flag, as it names the number pad's
+    # otherwise: Page Up to Down, Insert, Delete, Num /, Num Lock, Right Ctrl and Right Alt.
+    EXTENDED = (0x21..0x28).to_a + [0x2D, 0x2E, 0x6F, 0x90, 0xA3, 0xA5]
+
+    # @param code [Integer] the key's Windows code
+    # @return [String] the key's name as the keyboard layout writes it, like F10 or Ö
+    def self.name(code)
+      scan = api('user32', 'MapVirtualKeyW', 'ii', 'i').call(code, 0) << 16
+      scan |= 1 << 24 if EXTENDED.include?(code)
+      buffer = Wide.buffer(64)
+      length = api('user32', 'GetKeyNameTextW', 'ipi', 'i').call(scan, buffer, 64)
+      length > 0 ? Wide.text(buffer, length) : "Key #{code}"
+    rescue
+      "Key #{code}"
+    end
+
     # @return [Boolean] whether the window in front belongs to this game, true when Windows cannot tell
     def self.game_in_front?
       owner = [0].pack('L')
@@ -275,7 +293,8 @@ module MGQ_PartySheet
       2 => ["Image",          "An image of the Frontline."],
     }
 
-    # Hotkey's values, Windows key codes, by the key's name. The first one is the default.
+    # Hotkey's values in menus without key bindings, Windows key codes, by the key's name. The first
+    # one is the default in every menu.
     #
     # The game takes A, D, Q, S, W, X, Z, Page Up and Page Down as buttons, and the game, its
     # plugins or other mods take the F keys.
@@ -307,7 +326,7 @@ module MGQ_PartySheet
       add(OUTPUT, "[Party Sheet] Output", "What the party sheet writes into the Party sheets folder.", OUTPUTS)
       @menu.insert(-2, :key => WRITE, :name => "     -> Write Party Sheet", :sub => false,
                        :help => "Write the party sheet now. The key picked under Hotkey does the same anywhere in the game.")
-      add(HOTKEY, "[Party Sheet] Hotkey", "The key that writes the party sheet anywhere in the game.", hotkey_values)
+      add_hotkey
       @theme = add(THEME, "[Party Sheet] Theme", "The colours of the party sheet.", THEMES)
       @shown_theme = add(SHOWN_THEME, "     -> Shown Theme", "The colours of the party sheet while Theme is Static.", SHOWN_THEMES)
 
@@ -332,6 +351,19 @@ module MGQ_PartySheet
       values.each { |value, (label, text)| config::DATA_TEXT[key][value] = { :name => label, :help => text } }
       config::DEFAULT[key] = values.keys.first
       entry
+    end
+
+    # Adds Hotkey before the menu's last entry: a key binding, which takes the next key pressed, in
+    # Mod Config Remake 1.3.0 or later, else a choice among HOTKEYS.
+    #
+    # Older menus show a key binding as a button that does nothing.
+    def self.add_hotkey
+      name = "[Party Sheet] Hotkey"
+      help = "The key that writes the party sheet anywhere in the game."
+      return add(HOTKEY, name, help, hotkey_values) unless defined?(ModConfigRemake::Keys)
+
+      @menu.insert(-2, :key => HOTKEY, :name => name, :help => help, :keybind => true)
+      NWConst::Config::DEFAULT[HOTKEY] = HOTKEYS.keys.first
     end
 
     # @return [Hash{Integer => Array(String, String)}] HOTKEYS by their name and help in the menu
@@ -370,7 +402,24 @@ module MGQ_PartySheet
 
     # @return [Integer] the Windows code of the key that writes the sheet, 0 for none
     def self.hotkey
-      value(HOTKEY).to_i
+      code = value(HOTKEY).to_i
+      list_hotkey(code)
+      code
+    end
+
+    # Adds a key to Hotkey's values when they lack it, as a key bound in Mod Config Remake 1.3.0 or
+    # later may be once the save is played with an older menu.
+    #
+    # The game's own Config window fails on a value it has no name for.
+    #
+    # @param code [Integer] the key's Windows code
+    def self.list_hotkey(code)
+      values = NWConst::Config::DATA[HOTKEY]
+      return if values.nil? || values.include?(code)
+
+      name = Keyboard.name(code)
+      values.insert(-2, code)
+      NWConst::Config::DATA_TEXT[HOTKEY][code] = { :name => name, :help => "Press #{name} anywhere in the game." }
     end
 
     # @return [Boolean] whether the sheet writes the page
