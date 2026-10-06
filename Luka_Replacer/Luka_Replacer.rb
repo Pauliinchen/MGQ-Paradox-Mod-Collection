@@ -2,6 +2,7 @@
 #  Luka_Replacer.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-06: Swapped Luka's faces in every window that draws a face, not only the message window
 #      Paulinchen  2026-10-04: Created
 #
 #----------------------------------------------------------------
@@ -2438,10 +2439,10 @@ if MGQ_LukaReplacer::ENABLED && MGQ_LukaReplacer.hookable?
     MGQ_LukaReplacer.log("text hook FAILED: #{e.class}: #{e.message}")
   end
 
-  # Messages take their faces from the story's commands, not from Luka's data. The game's message
-  # window draws them with a hue through draw_face_hue, which draw_face calls too.
+  # Messages take their faces from the story's commands, not from Luka's data, so faces are swapped
+  # where any window draws them: through draw_face_hue, which draw_face calls too.
   begin
-    class Window_Message
+    class Window_Base
       if method_defined?(:draw_face_hue)
         alias mgq_luka_replacer_draw_face_hue draw_face_hue
         def draw_face_hue(face_name, face_index, *args)
