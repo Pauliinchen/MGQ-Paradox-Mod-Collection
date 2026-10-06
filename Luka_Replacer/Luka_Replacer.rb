@@ -2,7 +2,8 @@
 #  Luka_Replacer.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-06: Rebuilt the game's feature index of a hero's data, so their trait counts and Lest no longer crashes a new game
+#      Paulinchen  2026-10-06: Wrote the log into the game folder's Logs folder
+#                            - Rebuilt the game's feature index of a hero's data, so their trait counts and Lest no longer crashes a new game
 #                            - Closed the title commands while the list of heroes shows, so choosing a hero never looks like the plain title screen
 #                            - Swapped Luka's faces in every window that draws a face, not only the message window
 #      Paulinchen  2026-10-04: Created
@@ -17,7 +18,10 @@ module MGQ_LukaReplacer
   # Turns the mod off without uninstalling it.
   ENABLED = true
 
-  # Log next to Game.exe, which only appears when something went wrong.
+  # Folder next to Game.exe that holds the logs, shared with the user's other mods.
+  LOG_DIR = "Logs"
+
+  # Log in LOG_DIR, which only appears when something went wrong.
   LOG_FILE = "Luka Replacer.log"
 
   # Lines logged per session at most.
@@ -1297,7 +1301,8 @@ module MGQ_LukaReplacer
     @log_lines = (@log_lines || 0) + 1
     return if @log_lines > MAX_LOG_LINES
 
-    File.open(LOG_FILE, "ab") { |file| file.write("#{Time.now}  #{message}\n") }
+    Dir.mkdir(LOG_DIR) unless File.directory?(LOG_DIR)
+    File.open("#{LOG_DIR}/#{LOG_FILE}", "ab") { |file| file.write("#{Time.now}  #{message}\n") }
   rescue
   end
 
