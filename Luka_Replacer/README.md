@@ -55,3 +55,5 @@ The mod replaces no game methods. It runs alongside these, leaving what they do 
 ## Credits
 
 Cecil's images come from *Hyperdimension Girl Quest!* (D-Gate / The_HeroLuka).
+
+Herzfeld's images come from RPG Maker (Archeia).
