@@ -9,6 +9,7 @@ A menu for the options of your other mods, which replaces the Mod Config Menu. M
 - Left and right change an option, Confirm moves it to its next value or presses a button.
 - A key binding shows its key. Confirm it, then press the new key; Esc keeps the old one. Keys the game uses itself (Enter, Space, Esc, Z, X, Shift, Ctrl, A, S, D, Q, W, Page Up, Page Down, the arrows, Num 0, 2, 4, 6 and 8, F1, F2, F5 to F9 and F12; see [Keys the menu refuses](#keys-the-menu-refuses)) and keys another option has already are refused.
 - Options and buttons a mod greys out cannot be used until it allows them again.
+- In a multiplayer world that sets your mods' options for everyone, such as one of [Monster Girl Quest! Online](https://github.com/Pauliinchen/MGQ-Online), those options are greyed out while you play in it, and their help says they are set by the world. Key bindings stay yours.
 
 ## Install
 
@@ -33,6 +34,7 @@ Add your options the way the Mod Config Menu expects them: insert an entry befor
 | `:enable` | A proc; while it returns false, the option is greyed out and cannot be changed. |
 | `:on_change` | A proc called with the new value after each change. |
 | `:keybind` | `true` for a key binding: its value is a key's Windows code, such as `0x54` for T, which the menu shows by its name and replaces with the next key the player presses. It needs no `DATA`. Leave `:sub` out. |
+| `:personal` | `true` for an option that stays each player's own when a multiplayer world sets the options of your mod, such as a colour or a window's place. Key bindings always do. |
 | `:value` | For a key binding only: a proc that reads its key, in place of `$game_system.conf`, which the game keeps in each save. With it, the menu stores nothing itself: keep the key from `:on_change`, such as in a file of your mod, so it holds in every save. |
 
 `Scene_Config#refresh_mod_config` draws the options again, as in the Mod Config Menu; call it when one of your options changes how others show.

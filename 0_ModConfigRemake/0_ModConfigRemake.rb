@@ -2,6 +2,7 @@
 #  0_ModConfigRemake.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-06: Greyed out the options a multiplayer world sets, saying so in their help
 #      Paulinchen  2026-10-02: Added key bindings, options that take the next key pressed
 #                            - Added refresh_mod_config, which EXP Overlord calls after its options change
 #      Paulinchen  2026-09-28: Created
@@ -159,6 +160,7 @@ module ModConfigRemake
       extra = named ? text(named[:help]) : ""
       help += "\r\n#{extra}" unless extra.empty? || help.include?(extra)
     end
+    help += "\r\nSet by the world you play in." if world_key?(entry)
     help.gsub(/eval<(\S+)>/) { eval($1).to_s rescue "" }
   rescue
     ""
@@ -194,14 +196,41 @@ module ModConfigRemake
     nil
   end
 
-  # Tells whether an option can be changed, as its :enable proc says.
+  # Tells whether an option can be changed: not while a multiplayer world sets it, else as its
+  # :enable proc says.
   #
   # @param entry [Hash] The option's entry.
   # @return [Boolean] Whether it is not greyed out.
   def self.enabled?(entry)
+    return false if world_key?(entry)
+
     entry[:enable] ? (entry[:enable].call ? true : false) : true
   rescue
     true
+  end
+
+  # Takes the options a multiplayer world sets while the player is in it, such as Monster Girl
+  # Quest! Online's, which the menu then shows greyed out; none outside a world.
+  #
+  # @param keys [Array<Symbol>] The options' keys.
+  def self.world_keys=(keys)
+    @world_keys = Array(keys).map { |key| key.to_sym }
+  end
+
+  # Lists the options a multiplayer world sets.
+  #
+  # @return [Array<Symbol>] The options' keys, none outside a world.
+  def self.world_keys
+    @world_keys || []
+  end
+
+  # Tells whether a multiplayer world sets an option. Key bindings and options marked
+  # :personal => true stay the player's own.
+  #
+  # @param entry [Hash] The option's entry.
+  # @return [Boolean] Whether it does.
+  def self.world_key?(entry)
+    !entry[:personal] && !key_binding?(entry) && world_keys.include?(entry[:key])
   end
 
   # Links the menu to the options screen, once.
