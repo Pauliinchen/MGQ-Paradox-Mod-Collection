@@ -2,6 +2,7 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-06: Wrote the log into the game folder's Logs folder
 #      Paulinchen  2026-10-03: Showed what skills really cost in HP, MP and SP, priced the way the game does
 #                            - Listed skill chains, with the damage and cost of chained skills
 #                            - Ordered effects and boosts by their amount, then by name
@@ -50,7 +51,10 @@ module MGQ_PartySheet
   # 05_party_sheet_Alice.png.
   CHARACTER_FILE = "party_sheet"
 
-  # Log next to Game.exe, which only appears when something went wrong.
+  # Folder next to Game.exe that holds the logs, shared with the user's other mods.
+  LOG_DIR = "Logs"
+
+  # Log in LOG_DIR, which only appears when something went wrong.
   LOG_FILE = "Party Sheet.log"
 
   # Lines logged per session at most, a part missing from the game would be logged at every write.
@@ -174,8 +178,16 @@ module MGQ_PartySheet
     @log_lines = (@log_lines || 0) + 1
     return if @log_lines > MAX_LOG_LINES
 
-    File.open(path(LOG_FILE), "ab") { |file| file.write("#{Time.now}  #{message}\n") }
+    File.open(log_file, "ab") { |file| file.write("#{Time.now}  #{message}\n") }
   rescue
+  end
+
+  # Builds the full path of LOG_FILE in LOG_DIR, and makes the folder when it is missing.
+  #
+  # @return [String] the full path
+  def self.log_file
+    Dir.mkdir(path(LOG_DIR)) unless File.directory?(path(LOG_DIR))
+    path("#{LOG_DIR}/#{LOG_FILE}")
   end
 
   # The save the party was last saved to or loaded from, which names its sheet.
@@ -1746,7 +1758,7 @@ if ($Shots) {
                    "-File #{quoted(work_path(SCRIPT_FILE))}",
                    "-Browser #{quoted(browser)}",
                    "-UserData #{quoted(work_path('Browser'))}",
-                   "-Log #{quoted(MGQ_PartySheet.path(LOG_FILE))}"]
+                   "-Log #{quoted(MGQ_PartySheet.log_file)}"]
       arguments += ["-Convert #{quoted(work_path(CONVERT_FILE))}", "-Page #{quoted(MGQ_PartySheet.sheet(FILE))}"] if convert
       arguments += ["-Shots #{quoted(work_path(SHOTS_FILE))}"] if shots
       arguments.join(" ")

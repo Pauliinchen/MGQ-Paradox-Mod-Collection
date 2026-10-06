@@ -75,7 +75,7 @@ These are constants at the top of `Party_Sheet.rb`. Open it in any text editor t
 - `EMBED_IMAGES`: set to `false` for a much smaller page that loads its images from the game folder instead. It then only works while it stays in the `Party sheets` folder.
 - `PORTRAIT_QUALITY`: the WebP quality of the portraits, from 0 to 1, `0.85` by default. Set it to `nil` to keep the game's PNGs.
 
-If something is missing from the page or no image appears, `Party Sheet.log` in the game folder says why.
+If something is missing from the page or no image appears, `Logs\Party Sheet.log` in the game folder says why.
 
 ## Compatibility
 
