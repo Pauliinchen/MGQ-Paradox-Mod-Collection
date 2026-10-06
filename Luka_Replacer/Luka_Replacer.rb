@@ -2,7 +2,8 @@
 #  Luka_Replacer.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-06: Closed the title commands while the list of heroes shows, so choosing a hero never looks like the plain title screen
+#      Paulinchen  2026-10-06: Rebuilt the game's feature index of a hero's data, so their trait counts and Lest no longer crashes a new game
+#                            - Closed the title commands while the list of heroes shows, so choosing a hero never looks like the plain title screen
 #                            - Swapped Luka's faces in every window that draws a face, not only the message window
 #      Paulinchen  2026-10-04: Created
 #
@@ -378,6 +379,10 @@ module MGQ_LukaReplacer
     credit(data, hero.artist)
     make_female(data) if hero.sex == :female
     data.initial_level = hero.level if hero.level && hero.level > 0
+    # The game reads features through an index it builds once at load, and the copy of Luka's
+    # data still holds his; without the hero's trait in it, starting gear only the trait allows
+    # is taken off while the actor is built, which loops the game until its stack overflows.
+    data.setting_feature_data if data.respond_to?(:setting_feature_data)
     data
   end
 
