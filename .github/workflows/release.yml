@@ -19,10 +19,11 @@ jobs:
 
       - name: Zip Luka Replacer with its heroes
         run: |
-          mkdir -p stage/Luka_Replacer/Heroes
-          cp Luka_Replacer/Luka_Replacer.rb stage/
-          cp Luka_Replacer/Heroes/*.luka stage/Luka_Replacer/Heroes/
-          (cd stage && zip -r -X ../Luka_Replacer.zip .)
+          stage="$RUNNER_TEMP/stage"
+          mkdir -p "$stage/Luka_Replacer/Heroes"
+          cp Luka_Replacer/Luka_Replacer.rb "$stage/"
+          cp Luka_Replacer/Heroes/*.luka "$stage/Luka_Replacer/Heroes/"
+          (cd "$stage" && zip -r -X "$GITHUB_WORKSPACE/Luka_Replacer.zip" .)
 
       - name: Attach every mod to the release
         env:
