@@ -24,7 +24,7 @@ The mod unpacks a hero's images into `Patch\Luka_Replacer\Cache`. A file that is
 ## Install
 
 1. Install the community's mod loader: the `Patch.rb` from [*Patch.rb (enable Type 1 mods)*](https://mgq.miraheze.org/wiki/Paradox_mods#Patch.rb_(enable_Type_1_mods)) on the MGQ wiki, in your `Patch` folder. If you already use other Patch folder mods, you have it.
-2. [Download `Luka_Replacer.zip`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Luka_Replacer.zip) and extract it into the `Patch` folder, so that `Luka_Replacer.rb` lies in `Patch` and the heroes in `Patch\Luka_Replacer\Heroes`.
+2. [Download `Luka_Replacer.zip`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Luka_Replacer.zip) and extract it into the game folder, the one with `Game.exe`. Its `Patch` folder puts `Luka_Replacer.rb` into your `Patch` folder and the heroes into `Patch\Luka_Replacer\Heroes`.
 
 To uninstall, delete `Patch\Luka_Replacer.rb` and the `Patch\Luka_Replacer` folder. A save started with another hero keeps their starting job and gear; to play as Luka again, start a new game.
 

@@ -13,7 +13,7 @@ Small mods for Monster Girl Quest! Paradox RPG, one folder each. They are Patch 
 | [Party Sheet](Party_Sheet) | Writes a page with every party member's picture, stats, equipment, abilities and trait at the press of a hotkey, plus an image of the Frontline to share. | [Party_Sheet.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Party_Sheet.rb) |
 | [TimeStop Music](TimeStop_Music) | Keeps the battle music playing through time stop. | [TimeStop_Music.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/TimeStop_Music.rb) |
 
-To install one, download its `.rb` file and put it into the game's `Patch` folder. To uninstall it, delete that file. Luka Replacer comes as a zip instead: extract it into the `Patch` folder.
+To install one, download its `.rb` file and put it into the game's `Patch` folder. To uninstall it, delete that file. Luka Replacer comes as a zip instead: extract it into the game folder, the one with `Game.exe`.
 
 ## More mods
 
