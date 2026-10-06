@@ -2,7 +2,8 @@
 #  Luka_Replacer.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-06: Wrote the log into the game folder's Logs folder
+#      Paulinchen  2026-10-06: Stood Luka's actor in for itself while the game sets it up, so starting gear a hero cannot wear goes to the bag instead of crashing
+#                            - Wrote the log into the game folder's Logs folder
 #                            - Rebuilt the game's feature index of a hero's data, so their trait counts and Lest no longer crashes a new game
 #                            - Closed the title commands while the list of heroes shows, so choosing a hero never looks like the plain title screen
 #                            - Swapped Luka's faces in every window that draws a face, not only the message window
@@ -720,6 +721,67 @@ module MGQ_LukaReplacer
     return nil unless actor.is_a?(Game_Actor) && PERSONAS.include?(actor.id)
 
     hero(actor.instance_variable_get(:@mgq_luka_key) || @current)
+  end
+
+  # Builds one of Luka's forms as the game sets it up, standing in for it while it is not yet in
+  # the game's list of actors.
+  #
+  # Starting gear the hero cannot wear makes the game take it off while it sets the actor up, and
+  # that check looks the party's members up, Luka among them; without a stand-in each lookup sets
+  # Luka up anew, until the game's stack overflows.
+  #
+  # @param actor [Game_Actor] The actor being set up.
+  # @param actor_id [Integer] Its id.
+  # @return [Object] What the block returns.
+  def self.setting_up(actor, actor_id)
+    return yield unless PERSONAS.include?(actor_id)
+
+    building[actor_id] = actor
+    result = yield
+    report_unworn_gear(actor)
+    result
+  ensure
+    building.delete(actor_id) if PERSONAS.include?(actor_id)
+  end
+
+  # Lists Luka's forms the game is setting up, by actor id.
+  #
+  # @return [Hash{Integer => Game_Actor}] The actors.
+  def self.building
+    @building ||= {}
+  end
+
+  # Finds the stand-in for an actor the game looks up while setting it up.
+  #
+  # @param actor_id [Integer] The id looked up, which the game maps to its persona's.
+  # @param actors [Hash{Integer => Game_Actor}] The actors the game made already.
+  # @return [Game_Actor, nil] The actor being set up, nil when the game has it or sets up none.
+  def self.stand_in_actor(actor_id, actors)
+    return nil if building.empty?
+
+    data = $data_actors[actor_id]
+    persona_id = data && data.respond_to?(:original_persona_id) ? data.original_persona_id : actor_id
+    actors && actors[persona_id] ? nil : building[persona_id]
+  end
+
+  # Logs a hero's starting gear the game took off while it set the hero up, since they could not
+  # wear it; the game puts such gear in the bag. Characters of another player's game in MGQ
+  # Online, which are no plain Game_Actor, are left out.
+  #
+  # @param actor [Game_Actor] The hero's actor, set up.
+  def self.report_unworn_gear(actor)
+    hero = actor.instance_of?(Game_Actor) && hero_of(actor)
+    return unless hero
+
+    worn = actor.equips.compact
+    hero.equips.each do |slot, item_id|
+      item = item_id > 0 && (slot == 0 ? $data_weapons[item_id] : $data_armors[item_id])
+      next if !item || worn.include?(item)
+
+      log("#{name_of(hero)} could not wear their starting #{item.name}, which went to the bag.")
+    end
+  rescue => e
+    log("could not check the hero's starting gear: #{e.class}: #{e.message}")
   end
 
   # Finds the stats by level a character's base stats come from, when the hero has their own: the
@@ -2199,6 +2261,25 @@ if MGQ_LukaReplacer::ENABLED && MGQ_LukaReplacer.hookable?
     end
   rescue => e
     MGQ_LukaReplacer.log("actor hooks FAILED: #{e.class}: #{e.message}")
+  end
+
+  # Luka's forms stand in for themselves while the game sets them up, see setting_up.
+  begin
+    class Game_Actor
+      alias mgq_luka_replacer_setup setup
+      def setup(actor_id, *args)
+        MGQ_LukaReplacer.setting_up(self, actor_id) { mgq_luka_replacer_setup(actor_id, *args) }
+      end
+    end
+
+    class Game_Actors
+      alias mgq_luka_replacer_lookup []
+      def [](actor_id)
+        MGQ_LukaReplacer.stand_in_actor(actor_id, @data) || mgq_luka_replacer_lookup(actor_id)
+      end
+    end
+  rescue => e
+    MGQ_LukaReplacer.log("setup guard FAILED: #{e.class}: #{e.message}")
   end
 
   # Gear reserved for the character a hero is based on, which the hero may equip too.
