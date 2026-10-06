@@ -2,6 +2,7 @@
 #  Battle_Dialogue.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-06: Drew faces and speaker names the way the message window does, faces in their hue
 #      Paulinchen  2026-10-02: Showed an enemy's answers to Talk and other event lines at the enemy side
 #      Paulinchen  2026-09-29: Read the untranslated game's speaker lines and wrapped text without spaces
 #      Paulinchen  2026-09-28: Created
@@ -75,14 +76,18 @@ module Battle_Dialogue
   # Width of the bar.
   ACCENT_WIDTH = 3
 
-  # A speaker's name box code of the message system, "\n<Name>".
-  SPEAKER_CODE = /\\n<([^>]*)>/
+  # A speaker's name box code of the message system, "\n<Name>", its backslash converted.
+  SPEAKER_CODE = /\en<([^>]*)>/
 
   # The untranslated game's speaker line, the name in brackets opening a message: "【Name】".
   SPEAKER_LINE = /\A【([^】]*)】\s*/
 
   # A summon's line starts with its name alone on the first line, "Sylph:".
-  SUMMON_NAME = /\A([^:\\]{1,30}):\s*\z/
+  SUMMON_NAME = /\A([^:\e]{1,30}):\s*\z/
+
+  # A converted code of the message system, such as a color, an icon or a wait, and any other.
+  MESSAGE_CODE = /\e[A-Za-z]+(\[[^\]]*\])?(<[^>]*>)?/
+  OTHER_CODE = /\e./
 
   # Reports whether a battle is on screen, whose messages show in boxes.
   #
@@ -120,7 +125,8 @@ module Battle_Dialogue
     message = $game_message
     return false unless message.has_text? && !message.choice? && !message.num_input?
 
-    show(message.face_name, message.face_index, message.texts.dup)
+    face_hue = message.respond_to?(:face_hue) ? message.face_hue.to_i : 0
+    show(message.face_name, message.face_index, message.texts.dup, face_hue)
     message.clear
     true
   rescue
@@ -133,19 +139,20 @@ module Battle_Dialogue
   # @param face_name [String] the face file, empty for none
   # @param face_index [Integer] the face in the file
   # @param lines [Array<String>] the message's lines
-  def self.show(face_name, face_index, lines)
+  # @param face_hue [Integer] the hue the face is drawn in
+  def self.show(face_name, face_index, lines, face_hue = 0)
     # The untranslated game adds a speaker's line and what they say as one line with a break.
-    lines = lines.map { |line| line.to_s.split("\n") }.flatten
+    lines = converted(lines).map { |line| line.split("\n") }.flatten
     name = nil
 
     if (first = lines.first) && first =~ SPEAKER_CODE
-      name = $1
+      name = plain($1)
       lines[0] = first.sub(SPEAKER_CODE, "")
     elsif first && first =~ SPEAKER_LINE
-      name = $1
+      name = plain($1)
       lines[0] = first.sub(SPEAKER_LINE, "")
     elsif first && first =~ SUMMON_NAME
-      name = $1
+      name = plain($1)
       lines.shift
     end
 
@@ -156,8 +163,31 @@ module Battle_Dialogue
     side = !said ? :top : (@speaker ? side_of_battler(@speaker) : side_of_speaker(name, face_name.to_s))
     boxes = boxes_at(side)
     boxes.shift.dispose while boxes.size >= (side == :top ? MAX_STRIPS : MAX_BOXES)
-    boxes << Window_BattleDialogue.new(said ? face_name.to_s : "", face_index.to_i, name, lines, side)
+    boxes << Window_BattleDialogue.new(said ? face_name.to_s : "", face_index.to_i, face_hue, name, lines, side)
     arrange
+  end
+
+  # Fills in the message system's codes of a message's lines the way every window does, before the
+  # speaker is read from them, so the name shown is the one the message window would show.
+  #
+  # @param lines [Array<String>] the lines
+  # @return [Array<String>] the lines, the codes left starting with "\e"
+  def self.converted(lines)
+    converter = Window_Base.new(0, 0, 32, 32)
+    converter.visible = false
+    lines.map { |line| converter.convert_escape_characters(line.to_s) }
+  rescue
+    lines.map { |line| line.to_s.gsub("\\", "\e") }
+  ensure
+    converter.dispose if converter
+  end
+
+  # Turns a converted line into plain text: colors, icons and waits left out.
+  #
+  # @param line [String] the line
+  # @return [String] the plain text
+  def self.plain(line)
+    line.gsub(MESSAGE_CODE, "").gsub(OTHER_CODE, "").strip
   end
 
   # @param battler [Game_Battler] the battler who speaks
@@ -236,15 +266,17 @@ class Window_BattleDialogue < Window_Base
 
   # @param face_name [String] the face file, empty for none
   # @param face_index [Integer] the face in the file
+  # @param face_hue [Integer] the hue the face is drawn in
   # @param name [String, nil] who speaks
-  # @param lines [Array<String>] the message's lines, with the message system's codes
+  # @param lines [Array<String>] the message's lines, their codes converted
   # @param side [Symbol] :left for the player's team, :right for the enemy side, :top for a strip
-  def initialize(face_name, face_index, name, lines, side)
+  def initialize(face_name, face_index, face_hue, name, lines, side)
     @side = side
     @face_name = face_name
     @face_index = face_index
+    @face_hue = face_hue
     @name = name
-    @text = lines.map { |line| plain(line) }.join(" ")
+    @text = lines.map { |line| Battle_Dialogue.plain(line) }.join(" ")
     @text_lines = @side == :top ? [@text] : wrap(@text)
     super(0, 0, box_width, box_height)
     self.opacity = 0
@@ -383,26 +415,28 @@ class Window_BattleDialogue < Window_Base
     end
   end
 
-  # Draws the face shrunk to FACE_SIZE, next to the bar at the box's outer edge.
+  # Draws the face shrunk to FACE_SIZE, next to the bar at the box's outer edge. It is drawn full
+  # size by draw_face_hue, the way every window draws a face, then shrunk.
   def draw_small_face
-    bitmap = Cache.face(@face_name)
-    source = Rect.new(@face_index % FACE_COLUMNS * FACE_FILE_SIZE, @face_index / FACE_COLUMNS * FACE_FILE_SIZE,
-                      FACE_FILE_SIZE, FACE_FILE_SIZE)
+    face = Bitmap.new(FACE_FILE_SIZE, FACE_FILE_SIZE)
+    draw_onto(face) { draw_face_hue(@face_name, @face_index, @face_hue, 0, 0) }
     x = @side == :right ? contents.width - ACCENT_WIDTH - PADDING - FACE_SIZE : ACCENT_WIDTH + PADDING
-    contents.stretch_blt(Rect.new(x, PADDING, FACE_SIZE, FACE_SIZE), bitmap, source)
+    contents.stretch_blt(Rect.new(x, PADDING, FACE_SIZE, FACE_SIZE), face, face.rect)
   rescue
     @face_name = ""
+  ensure
+    face.dispose if face
   end
 
-  # Turns a line with the message system's codes into plain text: variables and names filled in,
-  # colors, icons and waits left out.
+  # Lets the block's drawing land on another bitmap than the box's contents.
   #
-  # @param line [String] the line
-  # @return [String] the plain text
-  def plain(line)
-    convert_escape_characters(line).gsub(/\e[A-Za-z]+(\[[^\]]*\])?(<[^>]*>)?/, "").gsub(/\e./, "").strip
-  rescue
-    line.gsub(/\\[A-Za-z]+(\[[^\]]*\])?/, "").gsub(/\\./, "").strip
+  # @param bitmap [Bitmap] the bitmap to draw on
+  def draw_onto(bitmap)
+    box = contents
+    self.contents = bitmap
+    yield
+  ensure
+    self.contents = box
   end
 
   # Breaks a text into lines that fit the box, between words, and inside a word too wide for a
