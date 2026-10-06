@@ -34,5 +34,8 @@ This mod wraps the following methods and calls the original from them:
 - `Scene_Battle#process_down_word`
 - `Scene_Battle#update_basic`
 - `Scene_Battle#terminate`
+- `Game_Message#clear`
 
 Mods that replace these without calling the original may not work together with it.
+
+A mod that shows battle messages of its own can name who says one by setting `$game_message.speaker` to that battler; the box then shows on that battler's side. Without it, the side is told by the speaker's name and face.

@@ -2,7 +2,9 @@
 #  Battle_Dialogue.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-06: Drew faces and speaker names the way the message window does, faces in their hue
+#      Paulinchen  2026-10-06: Took a battle message as soon as it is added, not only when the battle waits for it
+#                            - Kept a message's speaker on the message, where whoever adds it may set it
+#                            - Drew faces and speaker names the way the message window does, faces in their hue
 #      Paulinchen  2026-10-02: Showed an enemy's answers to Talk and other event lines at the enemy side
 #      Paulinchen  2026-09-29: Read the untranslated game's speaker lines and wrapped text without spaces
 #      Paulinchen  2026-09-28: Created
@@ -106,16 +108,16 @@ module Battle_Dialogue
     $game_temp.in_victory_message || BattleManager.instance_variable_get(:@phase).nil?
   end
 
-  # Marks a battler as the speaker of the lines the block shows, whose side decides the box's.
+  # Marks a battler as the speaker of the messages the block shows, whose side decides the box's.
   #
-  # @param battler [Game_Battler, nil] the battler, or the stand-in the game uses for automatic skills
+  # @param battler [Game_Battler, nil] the battler
   # @return [Object] what the block returns
   def self.speaking(battler)
-    earlier = @speaker
-    @speaker = defined?(Game_Master) && battler.is_a?(Game_Master) ? battler.observer : battler
+    earlier = $game_message.speaker
+    $game_message.speaker = battler
     yield
   ensure
-    @speaker = earlier
+    $game_message.speaker = earlier
   end
 
   # Takes the waiting message out of the message window and shows it in a box.
@@ -126,11 +128,21 @@ module Battle_Dialogue
     return false unless message.has_text? && !message.choice? && !message.num_input?
 
     face_hue = message.respond_to?(:face_hue) ? message.face_hue.to_i : 0
-    show(message.face_name, message.face_index, message.texts.dup, face_hue)
+    show(message.face_name, message.face_index, message.texts.dup, face_hue, speaker_of(message))
     message.clear
     true
   rescue
     false
+  end
+
+  # Finds the battler who says a message: the one it names, for the stand-in the game uses for
+  # automatic skills the battler it stands in for.
+  #
+  # @param message [Game_Message] the message
+  # @return [Game_Battler, nil] the battler, nil when the message names none
+  def self.speaker_of(message)
+    speaker = message.speaker
+    defined?(Game_Master) && speaker.is_a?(Game_Master) ? speaker.observer : speaker
   end
 
   # Shows a message: in a box at its speaker's side when a character says it, in a strip at the
@@ -140,7 +152,8 @@ module Battle_Dialogue
   # @param face_index [Integer] the face in the file
   # @param lines [Array<String>] the message's lines
   # @param face_hue [Integer] the hue the face is drawn in
-  def self.show(face_name, face_index, lines, face_hue = 0)
+  # @param speaker [Game_Battler, nil] who says it, nil to tell their side by the name and face
+  def self.show(face_name, face_index, lines, face_hue = 0, speaker = nil)
     # The untranslated game adds a speaker's line and what they say as one line with a break.
     lines = converted(lines).map { |line| line.split("\n") }.flatten
     name = nil
@@ -160,7 +173,7 @@ module Battle_Dialogue
     return if lines.empty? && name.nil?
 
     said = name || !face_name.to_s.empty?
-    side = !said ? :top : (@speaker ? side_of_battler(@speaker) : side_of_speaker(name, face_name.to_s))
+    side = !said ? :top : (speaker ? side_of_battler(speaker) : side_of_speaker(name, face_name.to_s))
     boxes = boxes_at(side)
     boxes.shift.dispose while boxes.size >= (side == :top ? MAX_STRIPS : MAX_BOXES)
     boxes << Window_BattleDialogue.new(said ? face_name.to_s : "", face_index.to_i, face_hue, name, lines, side)
@@ -477,6 +490,18 @@ module Battle_Dialogue
     return if @installed
     @installed = true
 
+    # A message names the battler who says it in its speaker, which whoever adds a message in a
+    # battle may set and which goes with the message when it is cleared.
+    Game_Message.class_eval do
+      attr_accessor :speaker unless method_defined?(:speaker)
+
+      alias_method :battle_dialogue_clear, :clear
+      define_method(:clear) do
+        battle_dialogue_clear
+        self.speaker = nil
+      end
+    end
+
     Scene_Battle.class_eval do
       alias_method :battle_dialogue_wait_for_message, :wait_for_message
       define_method(:wait_for_message) do
@@ -496,8 +521,11 @@ module Battle_Dialogue
         Battle_Dialogue.speaking(target) { battle_dialogue_process_down_word(target, *args) }
       end
 
+      # A message added without the battle waiting for it, such as one another mod adds, is taken
+      # before the message window sees it.
       alias_method :battle_dialogue_update_basic, :update_basic
       define_method(:update_basic) do
+        Battle_Dialogue.take_message if Battle_Dialogue.active?
         battle_dialogue_update_basic
         Battle_Dialogue.update
       end
