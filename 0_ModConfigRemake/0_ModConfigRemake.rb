@@ -2,7 +2,8 @@
 #  0_ModConfigRemake.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-06: Greyed out the options a multiplayer world sets, saying so in their help
+#      Paulinchen  2026-10-06: Opened the menu over the options list wherever it starts and fit the help into the help window, for the untranslated game
+#                            - Greyed out the options a multiplayer world sets, saying so in their help
 #      Paulinchen  2026-10-02: Added key bindings, options that take the next key pressed
 #                            - Added refresh_mod_config, which EXP Overlord calls after its options change
 #      Paulinchen  2026-09-28: Created
@@ -33,9 +34,6 @@ module ModConfigRemake
 
   # The arrow of an indented option's name, which a message about the option leaves out.
   INDENTED_MARK = /\A\s*->\s*/
-
-  # Where the menu starts on the options screen without tabs, below its help.
-  TOP = 120
 
   # Whether 0_ModConfigMenu.rb, which loads before this script, is installed, whose menu this one
   # replaces.
@@ -184,6 +182,21 @@ module ModConfigRemake
     end
     grouped.delete(GLOBAL) if grouped[GLOBAL].empty?
     grouped.to_a
+  end
+
+  # Shows a text in a help window, its lines past the window's last one joined onto that line.
+  #
+  # The untranslated game's help window has two lines, the translation's four.
+  #
+  # @param window [Window_Help] The help window.
+  # @param text [String] The text, its lines separated by "\r\n".
+  def self.show_help(window, text)
+    lines = text.split(/\r?\n/)
+    room = (window.height - window.standard_padding * 2) / window.line_height
+    lines[room - 1..-1] = lines[room - 1..-1].join(" ") if room >= 1 && lines.size > room
+    window.set_text(lines.join("\r\n"))
+  rescue
+    window.set_text(text)
   end
 
   # Runs a mod's own code, such as an :on_change proc or a button's handler, so that its failure
@@ -438,10 +451,10 @@ class Window_ModConfig < Window_Selectable
   # What a key binding's row shows while it waits for the key.
   WAITING_TEXT = "Press a key . . ."
 
-  # Creates the options, hidden, below the help of the options screen.
+  # Creates the options, hidden, until the menu opens and places them.
   def initialize
     @rows = []
-    super(0, ModConfigRemake::TOP, Graphics.width, Graphics.height - ModConfigRemake::TOP)
+    super(0, 0, Graphics.width, Graphics.height)
     deactivate.hide
   end
 
@@ -632,7 +645,7 @@ class Window_ModConfig < Window_Selectable
 
   # Shows the help of the current row.
   def update_help
-    @help_window.set_text(help_text(index)) if @help_window
+    ModConfigRemake.show_help(@help_window, help_text(index)) if @help_window
   end
 
   private
@@ -741,7 +754,7 @@ class Window_ModConfigMods < Window_Selectable
   def initialize(options_window)
     @options_window = options_window
     @names = []
-    super(0, ModConfigRemake::TOP, MIN_WIDTH, fitting_height(1))
+    super(0, 0, MIN_WIDTH, fitting_height(1))
     deactivate.hide
   end
 
@@ -852,9 +865,10 @@ class Scene_Config
     @mod_config_window.call_update_help
   end
 
-  # Opens the menu of the mods' options below the help of the options screen, over its list.
+  # Opens the menu of the mods' options over the list of the options screen, which starts lower on
+  # the translation, below its taller help.
   def start_mod_config
-    open_mod_config(0, ModConfigRemake::TOP, Graphics.width, Graphics.height - ModConfigRemake::TOP)
+    open_mod_config(@config_window.x, @config_window.y, @config_window.width, @config_window.height)
   end
 
   # Opens the menu of the mods' options in an area: the list of mods at its left, active, and the

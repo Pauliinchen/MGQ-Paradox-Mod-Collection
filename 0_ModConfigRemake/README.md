@@ -5,7 +5,7 @@ A menu for the options of your other mods, which replaces the Mod Config Menu. M
 - It lists your mods at the left, such as **Discord** or **EXP Overlord**, and shows the options of the one you point at at the right. Confirm moves into its options, Cancel goes back to the list, and Cancel in the list closes the menu.
 - Options that belong to no mod in particular are listed under **Global**, which only shows when there are any.
 - With newer versions of the English translation, whose options screen has tabs, the menu is the **Mods** tab. The original Mod Config Menu no longer opens there.
-- With older versions, the **Mod Config Menu** entry in the options opens it.
+- With older versions, and in the untranslated Japanese game, the **Mod Config Menu** entry in the options opens it.
 - Left and right change an option, Confirm moves it to its next value or presses a button.
 - A key binding shows its key. Confirm it, then press the new key; Esc keeps the old one. Keys the game uses itself (Enter, Space, Esc, Z, X, Shift, Ctrl, A, S, D, Q, W, Page Up, Page Down, the arrows, Num 0, 2, 4, 6 and 8, F1, F2, F5 to F9 and F12; see [Keys the menu refuses](#keys-the-menu-refuses)) and keys another option has already are refused.
 - Options and buttons a mod greys out cannot be used until it allows them again.
@@ -107,7 +107,7 @@ A binding never takes the mouse buttons, the Windows keys (they leave the game),
 
 ## Compatibility
 
-Tested on 3.06 with the English translation, with and without its tabbed options screen.
+Tested on 3.06 with the English translation, with and without its tabbed options screen, and on the untranslated 3.06. Its own texts are in English.
 
 This mod wraps the following methods and calls the original from them:
 
