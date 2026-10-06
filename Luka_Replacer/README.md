@@ -1,5 +1,7 @@
 # Luka Replacer
 
+> **Experimental.** Luka Replacer has known bugs, and much of the story played with another hero is untested. Keep a copy of your saves, and please report what you find as an [issue](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/issues).
+
 Lets you start a new game with another hero in Luka's place. The story still treats your hero as Luka, but they carry their own name, looks, sex, base stats, starting jobs and races (several, each with a level), equipment and trait, and get their own share of what the story gives Luka.
 
 - After **New Game**, a list asks who to play as: Luka or one of the heroes.
@@ -22,9 +24,9 @@ Lets you start a new game with another hero in Luka's place. The story still tre
 
 ## Heroes
 
-Kazuya (an Engineer with a Dueling Pistol) comes with the mod. More heroes come as **hero files**: one `<name>.luka` file per hero in `Patch\Luka_Replacer\Heroes`, which the [Hero Designer](https://github.com/Pauliinchen/MGQ-Paradox-Hero-Designer) makes and edits. A file holds the hero's whole pack, their images included. A hero file named `kazuya.luka` replaces the built-in Kazuya.
+Kazuya (an Engineer with a Dueling Pistol) comes with the mod. More heroes come as **hero files**: one `<name>.luka` file per hero in `Patch\Luka_Replacer\Heroes`. A file holds the hero's whole pack, their images included. A hero file named `kazuya.luka` replaces the built-in Kazuya.
 
-The mod unpacks a hero's images into `Patch\Luka_Replacer\Cache` and unpacks them again only when the hero file changes. A file that is not a valid hero file is skipped and noted in `Luka Replacer.log`. Hero pack folders from older versions are no longer read; the Hero Designer turns them into hero files.
+The mod unpacks a hero's images into `Patch\Luka_Replacer\Cache` and unpacks them again only when the hero file changes. A file that is not a valid hero file is skipped and noted in `Luka Replacer.log`.
 
 ## Install
 

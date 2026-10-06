@@ -9,8 +9,7 @@
 # Lets a new game start with another hero in Luka's place. It is a reskin: the hero keeps Luka's
 # actor ids, so the story still treats them as Luka, and brings their own name, looks, starting
 # job, race, equipment and trait, and their own share of what the story gives Luka. Heroes come
-# from hero packs, which the Hero Designer writes. Every entry point rescues, so the mod never
-# stops the game.
+# from hero packs. Every entry point rescues, so the mod never stops the game.
 module MGQ_LukaReplacer
   # Turns the mod off without uninstalling it.
   ENABLED = true
@@ -785,8 +784,8 @@ module MGQ_LukaReplacer
     end
   end
 
-  # Works out a stat at a level of its curve, the same sum as the Hero Designer's: from the level 1
-  # value to the level 99 value along the power 2^(growth/10) of the share of the way.
+  # Works out a stat at a level of its curve: from the level 1 value to the level 99 value along
+  # the power 2^(growth/10) of the share of the way.
   #
   # @param curve [Array(Integer, Integer, Integer)] The level 1 value, level 99 value and growth.
   # @param level [Integer] The level, 0 to 99.
@@ -1295,7 +1294,7 @@ module MGQ_LukaReplacer
   rescue
   end
 
-  # Hero packs: a hero file <key>.luka per hero in HEROES_DIR, which the Hero Designer writes. It
+  # Hero packs: a hero file <key>.luka per hero in HEROES_DIR. It
   # holds the entry PACK_FILE and a <file>.png entry per pack image, hidden so that no text editor
   # opens it.
   #
