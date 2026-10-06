@@ -2,7 +2,8 @@
 #  Luka_Replacer.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-06: Swapped Luka's faces in every window that draws a face, not only the message window
+#      Paulinchen  2026-10-06: Closed the title commands while the list of heroes shows, so choosing a hero never looks like the plain title screen
+#                            - Swapped Luka's faces in every window that draws a face, not only the message window
 #      Paulinchen  2026-10-04: Created
 #
 #----------------------------------------------------------------
@@ -2053,11 +2054,12 @@ if MGQ_LukaReplacer::ENABLED && MGQ_LukaReplacer.hookable?
         end
       end
 
-      # Opens the list of heroes over the title commands. The title screen disposes its windows
-      # whenever it opens another screen, like the options, and comes back as the same scene, so
-      # the list is made again once disposed.
+      # Opens the list of heroes in place of the title commands, which close meanwhile, so it never
+      # looks like the plain title screen. The title screen disposes its windows whenever it opens
+      # another screen, like the options, and comes back as the same scene, so the list is made
+      # again once disposed.
       def mgq_luka_replacer_open_heroes
-        @command_window.deactivate if @command_window
+        @command_window.close.deactivate if @command_window
         unless mgq_luka_replacer_heroes_alive?
           @mgq_luka_replacer_heroes = MGQ_LukaReplacer::Window_Heroes.new
           @mgq_luka_replacer_heroes.set_handler(:hero, method(:mgq_luka_replacer_on_hero))
@@ -2080,7 +2082,7 @@ if MGQ_LukaReplacer::ENABLED && MGQ_LukaReplacer.hookable?
       # Goes back to the title commands.
       def mgq_luka_replacer_on_heroes_cancel
         mgq_luka_replacer_close_heroes
-        @command_window.activate if @command_window
+        @command_window.open.activate if @command_window
       end
 
       # Hides the list of heroes and its heading. The scene disposes them as it ends: it updates
