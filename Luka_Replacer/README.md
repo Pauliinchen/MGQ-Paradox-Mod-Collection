@@ -24,7 +24,7 @@ Lets you start a new game with another hero in Luka's place. The story still tre
 
 ## Heroes
 
-One hero is built into the script, and the download brings several more as **hero files**: one `<name>.luka` file per hero in `Patch\Luka_Replacer\Heroes`. A file holds the hero's whole pack, their images included, and a hero file with the built-in hero's name replaces it. More heroes are added the same way.
+Luka Replacer comes with 8 heroes as **hero files**: one `<name>.luka` file per hero in `Patch\Luka_Replacer\Heroes`. A file holds the hero's whole pack, their images included. More heroes are added the same way.
 
 The mod unpacks a hero's images into `Patch\Luka_Replacer\Cache` and unpacks them again only when the hero file changes. A file that is not a valid hero file is skipped and noted in `Luka Replacer.log`.
 
