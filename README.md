@@ -6,14 +6,14 @@ Small mods for Monster Girl Quest! Paradox RPG, one folder each. They are Patch 
 |---|---|---|
 | [Battle Dialogue](Battle_Dialogue) | Shows what is said in battle in boxes at the sides of the screen instead of the message window, so the battle never stops for a key press. | [Battle_Dialogue.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Battle_Dialogue.rb) |
 | [Level Cap](Level_Cap) | Caps your level until the next story boss falls, and limits how many jobs and races of each tier your characters can take up. | [Level_Cap.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Level_Cap.rb) |
-| [Luka Replacer](Luka_Replacer) | Lets a new game start with another hero in Luka's place, with their own name, looks, starting kit and trait. More heroes come as hero files. Experimental. | [Luka_Replacer.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Luka_Replacer.rb) |
+| [Luka Replacer](Luka_Replacer) | Lets a new game start with another hero in Luka's place, with their own name, looks, starting kit and trait. More heroes come as hero files. Experimental. | [Luka_Replacer.zip](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Luka_Replacer.zip) |
 | [Map Display](Map_Display) | Shows the name of the map in the top left corner after each map change. | [Map_Display.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Map_Display.rb) |
 | [Mod Config Remake](0_ModConfigRemake) | Replaces the Mod Config Menu with a list of your mods next to the options of the one chosen, as a Mods tab of the translation's tabbed options screen or behind its own entry in older versions. Mods made for the Mod Config Menu work as they are, and mods can offer key bindings, which take the next key you press. | [0_ModConfigRemake.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/0_ModConfigRemake.rb) |
 | [Now Playing](Now_Playing) | Shows the name of the music in the top right corner whenever a new track starts. | [Now_Playing.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Now_Playing.rb) |
 | [Party Sheet](Party_Sheet) | Writes a page with every party member's picture, stats, equipment, abilities and trait at the press of a hotkey, plus an image of the Frontline to share. | [Party_Sheet.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Party_Sheet.rb) |
 | [TimeStop Music](TimeStop_Music) | Keeps the battle music playing through time stop. | [TimeStop_Music.rb](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/TimeStop_Music.rb) |
 
-To install one, download its `.rb` file and put it into the game's `Patch` folder. To uninstall it, delete that file.
+To install one, download its `.rb` file and put it into the game's `Patch` folder. To uninstall it, delete that file. Luka Replacer comes as a zip instead: extract it into the `Patch` folder.
 
 ## More mods
 
@@ -22,4 +22,4 @@ To install one, download its `.rb` file and put it into the game's `Patch` folde
 
 ## Disclaimer
 
-This is an unofficial fan project. It is not affiliated with Torotoro Resistance, the creators of Monster Girl Quest, or the English translation team. It contains no game or translation files, apart from screenshots showing what a mod does.
+This is an unofficial fan project. It is not affiliated with Torotoro Resistance, the creators of Monster Girl Quest, or the English translation team. It contains no game or translation files, apart from screenshots showing what a mod does and the images of Luka Replacer's Cecil, which come from *Hyperdimension Girl Quest!*.

@@ -24,14 +24,14 @@ Lets you start a new game with another hero in Luka's place. The story still tre
 
 ## Heroes
 
-Kazuya (an Engineer with a Dueling Pistol) comes with the mod. More heroes come as **hero files**: one `<name>.luka` file per hero in `Patch\Luka_Replacer\Heroes`. A file holds the hero's whole pack, their images included. A hero file named `kazuya.luka` replaces the built-in Kazuya.
+One hero is built into the script, and the download brings several more as **hero files**: one `<name>.luka` file per hero in `Patch\Luka_Replacer\Heroes`. A file holds the hero's whole pack, their images included, and a hero file with the built-in hero's name replaces it. More heroes are added the same way.
 
 The mod unpacks a hero's images into `Patch\Luka_Replacer\Cache` and unpacks them again only when the hero file changes. A file that is not a valid hero file is skipped and noted in `Luka Replacer.log`.
 
 ## Install
 
 1. Install the community's mod loader: the `Patch.rb` from [*Patch.rb (enable Type 1 mods)*](https://mgq.miraheze.org/wiki/Paradox_mods#Patch.rb_(enable_Type_1_mods)) on the MGQ wiki, in your `Patch` folder. If you already use other Patch folder mods, you have it.
-2. [Download `Luka_Replacer.rb`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Luka_Replacer.rb) and put it into the `Patch` folder.
+2. [Download `Luka_Replacer.zip`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Luka_Replacer.zip) and extract it into the `Patch` folder. You then have `Luka_Replacer.rb` in `Patch`, and the heroes in `Patch\Luka_Replacer\Heroes`.
 3. For more heroes, put their `.luka` files into `Patch\Luka_Replacer\Heroes`.
 
 To uninstall, delete `Patch\Luka_Replacer.rb` and the `Patch\Luka_Replacer` folder. A save started with another hero keeps their starting job and gear after that. To play as Luka again, start a new game.
@@ -59,3 +59,7 @@ The mod replaces no game methods. It runs alongside these, leaving what they do 
 - `Game_Player`, `Game_Follower` and `Game_Event`: `character_name` and `character_index`
 - `Window_Base#convert_escape_characters` and `Bitmap#draw_text`
 - `Window_Message#draw_face_hue`
+
+## Credits
+
+Cecil's images come from *Hyperdimension Girl Quest!* (D-Gate / The_HeroLuka).
