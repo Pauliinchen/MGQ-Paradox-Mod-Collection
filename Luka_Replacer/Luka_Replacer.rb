@@ -2,7 +2,8 @@
 #  Luka_Replacer.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-06: Stood Luka's actor in for itself while the game sets it up, so starting gear a hero cannot wear goes to the bag instead of crashing
+#      Paulinchen  2026-10-06: Gave each of Luka's later forms its own Library artist credit
+#                            - Stood Luka's actor in for itself while the game sets it up, so starting gear a hero cannot wear goes to the bag instead of crashing
 #                            - Wrote the log into the game folder's Logs folder
 #                            - Rebuilt the game's feature index of a hero's data, so their trait counts and Lest no longer crashes a new game
 #                            - Closed the title commands while the list of heroes shows, so choosing a hero never looks like the plain title screen
@@ -243,10 +244,10 @@ module MGQ_LukaReplacer
 
   # What a hero's pack sets for one of Luka's later forms; what it leaves out comes from the base
   # form. The form's trait replaces the base form's only when own_trait is set, and its cut-ins,
-  # expressions and follow_lines, nil without a line of them, the base form's. Its face cell goes
-  # with its own face.
+  # expressions, follow_lines and artist, nil without a line of them, the base form's. Its face
+  # cell goes with its own face.
   Form = Struct.new(:sprite, :face, :picture, :own_trait, :trait_name, :trait_lines, :features, :tags,
-                    :source_id, :cutins, :face_cell, :expressions, :follow_lines)
+                    :source_id, :cutins, :face_cell, :expressions, :follow_lines, :artist)
 
   class << self
     # The key of the hero this game plays, nil for Luka.
@@ -381,7 +382,7 @@ module MGQ_LukaReplacer
     data.instance_variable_set(:@features, features_of(hero, luka, persona_id))
     data.note = note_of(hero, luka, persona_id)
     data.note_analyze
-    credit(data, hero.artist)
+    credit(data, artist_of(hero, persona_id))
     make_female(data) if hero.sex == :female
     data.initial_level = hero.level if hero.level && hero.level > 0
     # The game reads features through an index it builds once at load, and the copy of Luka's
@@ -389,6 +390,16 @@ module MGQ_LukaReplacer
     # is taken off while the actor is built, which loops the game until its stack overflows.
     data.setting_feature_data if data.respond_to?(:setting_feature_data)
     data
+  end
+
+  # Reads whom the Library credits for a hero's form: the form's own artist, else the base form's.
+  #
+  # @param hero [Hero] The hero.
+  # @param persona_id [Integer] One of PERSONAS.
+  # @return [String, nil] The artist, nil for no credit.
+  def self.artist_of(hero, persona_id)
+    form = persona_id != BASE_FORM && hero.forms[persona_id]
+    (form && form.artist) || hero.artist
   end
 
   # Sets the Library's artist credit of a form.
@@ -1434,6 +1445,7 @@ module MGQ_LukaReplacer
   #   form2.sprite=, form2.face=, form2.picture=   the looks of Luka's later forms (form2 and
   #                                form3); left out, the base form's
   #   form2.source=<actor>         the actor whose battle lines the form speaks; left out, source's
+  #   form2.artist=<text>          the form's Library artist credit; left out, the base form's
   #   form2.cutin=                 the form's cut-ins; without any, the base form's
   #   form2.face_cell=             the cell of the form's own pack face
   #   form2.expressions=, form2.expressions_follow_lines=   the form's; left out, the base form's
@@ -1617,7 +1629,7 @@ module MGQ_LukaReplacer
     # @param name [String] The key after "formN.".
     # @param value [String] The value.
     def self.read_form_line(hero, persona_id, name, value)
-      form = hero.forms[persona_id] ||= Form.new(nil, nil, nil, false, nil, [], [], [], nil, nil, nil, nil, nil)
+      form = hero.forms[persona_id] ||= Form.new(nil, nil, nil, false, nil, [], [], [], nil, nil, nil, nil, nil, nil)
       case name
       when "sprite" then form.sprite = image(value, true)
       when "face" then form.face = image(value, true)
@@ -1632,6 +1644,7 @@ module MGQ_LukaReplacer
       when "trait_line" then form.trait_lines.push(value)
       when "feature" then feature(form, value)
       when "tag" then form.tags.push(value) if value =~ /\A<[^<>]+>\z/
+      when "artist" then form.artist = value unless value.empty? || value =~ /[<>]/
       end
     end
 
