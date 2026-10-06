@@ -2,6 +2,7 @@
 #  Level_Cap.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-06: Wrote the log into the game folder's Logs folder
 #      Paulinchen  2026-10-05: Created
 #
 #----------------------------------------------------------------
@@ -15,7 +16,10 @@ module MGQ_LevelCap
   # Turns the mod off without uninstalling it.
   ENABLED = true
 
-  # Log next to Game.exe, which only appears when something went wrong.
+  # Folder next to Game.exe that holds the logs, shared with the user's other mods.
+  LOG_DIR = "Logs"
+
+  # Log in LOG_DIR, which only appears when something went wrong.
   LOG_FILE = "Level Cap.log"
 
   # Lines logged per session at most.
@@ -166,7 +170,8 @@ module MGQ_LevelCap
     @log_lines = (@log_lines || 0) + 1
     return if @log_lines > MAX_LOG_LINES
 
-    File.open(LOG_FILE, "ab") { |file| file.write("#{Time.now}  #{message}\n") }
+    Dir.mkdir(LOG_DIR) unless File.directory?(LOG_DIR)
+    File.open("#{LOG_DIR}/#{LOG_FILE}", "ab") { |file| file.write("#{Time.now}  #{message}\n") }
   rescue
   end
 
