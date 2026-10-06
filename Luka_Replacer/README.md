@@ -42,6 +42,7 @@ The mod replaces no game methods. It runs alongside these, leaving what they do 
 - `DataManager.setup_new_game` and `DataManager.extract_save_contents`, to keep the hero in the save
 - `Cache.load_bitmap`, for the images in hero files
 - `Game_Actor#actor`, `#set_graphic`, `#base`, `#skill_learnable?`, `#exp_curve` and `#equippable?`, and `RPG::EquipItem#exclusive_actors`
+- `Game_Actor#setup` and `Game_Actors#[]`, so starting gear your hero cannot wear goes to the bag
 - `Game_Actor#word_id`, `#skill_word_hash`, `#down_word_hash`, `#exist_cutin?`, `#skill_word`, `#dead_word`, `#orgasm_word`, `#predation_word` and `#incontinence_word`, for the hero's battle lines, cut-ins and expressions
 - `Scene_Battle#process_skill_word`, `#process_down_word` and `#process_luca_orgasm`
 - `Game_Interpreter#setup`, `#run`, `#set_class_level`, `#persona_change` and `#command_318`, for what the story gives Luka
@@ -49,7 +50,7 @@ The mod replaces no game methods. It runs alongside these, leaving what they do 
 - `RPG::Skill#ext_scope`, so binding finds a heroine
 - `Game_Player`, `Game_Follower` and `Game_Event`: `character_name` and `character_index`
 - `Window_Base#convert_escape_characters` and `Bitmap#draw_text`
-- `Window_Message#draw_face_hue`
+- `Window_Base#draw_face_hue` (`#draw_face` in versions without it), for faces in every window
 
 ## Credits
 
