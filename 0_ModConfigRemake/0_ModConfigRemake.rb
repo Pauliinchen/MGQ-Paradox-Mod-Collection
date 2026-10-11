@@ -2,6 +2,7 @@
 #  0_ModConfigRemake.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-11: Added options a mod keeps itself, whose value its :value proc reads and its :on_change keeps, the menu storing nothing
 #      Paulinchen  2026-10-06: Opened the menu over the options list wherever it starts and fit the help into the help window, for the untranslated game
 #                            - Greyed out the options a multiplayer world sets, saying so in their help
 #      Paulinchen  2026-10-02: Added key bindings, options that take the next key pressed
@@ -83,16 +84,35 @@ module ModConfigRemake
     entry[:keybind] ? true : false
   end
 
-  # Reads a key binding's current value, from its :value proc when it has one.
+  # Reads a key binding's or a mod-kept option's current value, from its :value proc when it has one.
   #
-  # Only key bindings read :value, so an option of another mod with a key of that name stays as it is.
+  # Only key bindings and options marked :mod_stored read :value, so an option of another mod with a
+  # key of that name stays as it is.
   #
-  # @param entry [Hash] The key binding's entry.
+  # @param entry [Hash] The option's entry.
   # @return [Object] Its value.
   def self.entry_value(entry)
     entry[:value].respond_to?(:call) ? entry[:value].call : value_of(entry[:key])
   rescue
     nil
+  end
+
+  # Tells whether a mod keeps an option's value itself, such as in a file of its own so it holds in
+  # every save: its :value proc reads it, its :on_change keeps it, and the menu stores nothing.
+  #
+  # @param entry [Hash] The option's entry.
+  # @return [Boolean] Whether the mod keeps it.
+  def self.mod_stored?(entry)
+    entry[:mod_stored] && entry[:value].respond_to?(:call) ? true : false
+  end
+
+  # Reads an option's current value: from its mod for an option the mod keeps, else from
+  # $game_system.conf.
+  #
+  # @param entry [Hash] The option's entry.
+  # @return [Object] Its value.
+  def self.current_value(entry)
+    mod_stored?(entry) ? entry_value(entry) : value_of(entry[:key])
   end
 
   # Finds the option of any mod that a key is bound to already.
@@ -123,7 +143,7 @@ module ModConfigRemake
   def self.value_text(entry)
     return Keys.name(entry_value(entry).to_i) if key_binding?(entry)
 
-    value = value_of(entry[:key])
+    value = current_value(entry)
     texts = NWConst::Config::DATA_TEXT[entry[:key]]
     named = texts[value] if texts
     return named[:name].to_s if named && named[:name]
@@ -154,7 +174,7 @@ module ModConfigRemake
       help += "\r\nConfirm, then press the new key."
     elsif entry[:sub]
       texts = NWConst::Config::DATA_TEXT[entry[:key]]
-      named = texts[value_of(entry[:key])] if texts
+      named = texts[current_value(entry)] if texts
       extra = named ? text(named[:help]) : ""
       help += "\r\n#{extra}" unless extra.empty? || help.include?(extra)
     end
@@ -546,7 +566,7 @@ class Window_ModConfig < Window_Selectable
 
     row = entry(index)
     texts = DATA_TEXT[row[:key]]
-    named = texts[ModConfigRemake.value_of(row[:key])] if texts
+    named = texts[ModConfigRemake.current_value(row)] if texts
     named ? ModConfigRemake.text(named[:help]) : ""
   rescue
     ""
@@ -661,9 +681,9 @@ class Window_ModConfig < Window_Selectable
     values = ModConfigRemake.values_of(row)
     return if values.empty?
 
-    at = ModConfigRemake.index_of(values, ModConfigRemake.value_of(row[:key])) || 0
+    at = ModConfigRemake.index_of(values, ModConfigRemake.current_value(row)) || 0
     value = values[(at + step) % values.size]
-    $game_system.conf[row[:key]] = value
+    $game_system.conf[row[:key]] = value unless ModConfigRemake.mod_stored?(row)
     ModConfigRemake.safely { row[:on_change].call(value) } if row[:on_change].respond_to?(:call)
     Sound.play_cursor
     refresh
