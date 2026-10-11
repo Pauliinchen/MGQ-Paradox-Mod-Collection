@@ -1,6 +1,6 @@
 # Map Display
 
-Shows the name of the map in the top left corner for a few seconds after each map change, in the same style as [Now Playing](../Now_Playing) with the coloured bar on the right. It replaces the game's own centred map name.
+Shows the name of the map in the top left corner for a few seconds after each map change, in the same style as [Now Playing](../Now_Playing) with the colored bar on the right. It replaces the game's own centered map name.
 
 - Slides in, stays for 3 seconds, then fades out.
 - Maps without a name, and maps where the game turns the name display off, show nothing.

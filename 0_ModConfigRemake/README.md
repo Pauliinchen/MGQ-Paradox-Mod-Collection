@@ -35,7 +35,8 @@ Add your options the way the Mod Config Menu expects them: insert an entry befor
 | `:on_change` | A proc called with the new value after each change. |
 | `:keybind` | `true` for a key binding: its value is a key's Windows code, such as `0x54` for T, which the menu shows by its name and replaces with the next key the player presses. It needs no `DATA`. Leave `:sub` out. |
 | `:personal` | `true` for an option that stays each player's own when a multiplayer world sets the options of your mod, such as a colour or a window's place. Key bindings always do. |
-| `:value` | For a key binding only: a proc that reads its key, in place of `$game_system.conf`, which the game keeps in each save. With it, the menu stores nothing itself: keep the key from `:on_change`, such as in a file of your mod, so it holds in every save. |
+| `:value` | For a key binding, or an option marked `:mod_stored`: a proc that reads its value, in place of `$game_system.conf`, which the game keeps in each save. With it, the menu stores nothing itself: keep the value from `:on_change`, such as in a file of your mod, so it holds in every save. |
+| `:mod_stored` | `true` for an option with values that your mod keeps itself: the menu reads it with `:value` and only calls `:on_change`. Check `ModConfigRemake.respond_to?(:mod_stored?)` before adding one, since older menus store every option in the save. |
 
 `Scene_Config#refresh_mod_config` draws the options again, as in the Mod Config Menu; call it when one of your options changes how others show.
 
@@ -82,8 +83,8 @@ end
 
 - **The value** is the key's Windows code. The menu shows its name and adds "Confirm, then press the new key." to your help, so don't write that yourself.
 - **The default** comes from `DEFAULT`, as for any option. Set it even when the key binding isn't added, so older menus keep it. Pick a key the game leaves free: the menu refuses the keys below and keys another option already has when a player binds one, but it doesn't check your default.
-- **Reading the key** is up to your mod; the menu only stores its code. `GetAsyncKeyState` reports a key whichever window is in front, so check that the game is in front if that matters.
-- **One key for every save:** the game keeps `$game_system.conf` in each save, so a key bound here holds only in the save it was bound in. To keep it in every save, store it yourself: add `:value => proc { MyMod.hotkey }` and `:on_change => proc { |code| MyMod.store_hotkey(code) }`, and read and write the key in a file of your mod.
+- **Reading the hotkey** is up to your mod; the menu only stores its code. `GetAsyncKeyState` reports a key whichever window is in front, so check that the game is in front if that matters.
+- **One hotkey for every save:** the game keeps `$game_system.conf` in each save, so a hotkey bound here holds only in the save it was bound in. To keep it in every save, store it yourself: add `:value => proc { MyMod.hotkey }` and `:on_change => proc { |code| MyMod.store_hotkey(code) }`, and read and write the hotkey in a file of your mod.
 - **Esc** keeps the old key and doesn't call `:on_change`. `:enable` greys a key binding out like any other option. Key bindings take keyboard keys only, not gamepad buttons.
 
 #### Keys the menu refuses
