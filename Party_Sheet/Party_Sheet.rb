@@ -2,7 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
-#      Paulinchen  2026-10-22: Showed the whole face where a member has no picture
+#      Paulinchen  2026-10-22: Uploaded the page and the character image with faces instead of pictures
+#                            - Showed the whole face where a member has no picture
 #      Paulinchen  2026-10-17: Added an Upload option that shares each written sheet on mgqonline.org for 7 days
 #      Paulinchen  2026-10-06: Wrote the log into the game folder's Logs folder
 #      Paulinchen  2026-10-03: Showed what skills really cost in HP, MP and SP, priced the way the game does
@@ -79,12 +80,12 @@ module MGQ_PartySheet
     !Scene_Base.method_defined?(:mgq_party_sheet_update_basic)
   end
 
-  # Writes what the Output option asks for, for the party that is loaded, uploads the page when the
-  # Upload option asks for it, and plays the save sound when it did, the buzzer when no game is
-  # loaded.
+  # Writes what the Output option asks for, for the party that is loaded, uploads a copy of the page
+  # with every member's face instead of her picture when the Upload option asks for it, and plays
+  # the save sound when it did, the buzzer when no game is loaded.
   #
-  # The site takes the whole party as a page only, so the page is built for the upload even while
-  # Output is Image, and then kept in the temporary folder instead of Party sheets.
+  # The site takes the whole party as a page only, so the copy is uploaded even while Output is
+  # Image.
   def self.write
     return unless ENABLED
 
@@ -96,20 +97,22 @@ module MGQ_PartySheet
     Dir.mkdir(path(FOLDER)) unless File.directory?(path(FOLDER))
     # The site refuses a page that links its images rather than carrying them.
     upload = Options.upload? && EMBED_IMAGES
-    page = Options.page? || upload ? Page.build : nil
-    page_file = Options.page? ? sheet(FILE) : Browser.work_path(Browser::UPLOAD_FILE)
+    page = Options.page? ? Page.build : nil
+    page_file = page ? sheet(FILE) : nil
+    upload_file = Browser.work_path(Browser::UPLOAD_FILE)
     Browser.prepare
     File.open(page_file, "wb") { |file| file.write(page) } if page
+    File.open(upload_file, "wb") { |file| file.write(Page.build(true)) } if upload
     shots = Options.image? ? [[Page.frontline(Browser.base), sheet(IMAGE_FILE)]] : []
-    Browser.run(page, page_file, shots, upload ? [page_file, sheet(FILE), sheet(LINK_FILE)] : nil)
+    Browser.run(page, page_file, shots, upload ? [upload_file, sheet(FILE), sheet(LINK_FILE)] : nil)
     Sound.play_save
   rescue => e
     log("could not write the party sheet: #{e.class}: #{e.message}")
   end
 
-  # Takes the image of one member, with everything her card holds, uploads it when the Upload
-  # option asks for it, and plays the save sound when the browser started, the buzzer when it
-  # could not.
+  # Takes the image of one member, with everything her card holds, uploads a copy with her face
+  # instead of her picture when the Upload option asks for it, and plays the save sound when the
+  # browser started, the buzzer when it could not.
   #
   # @param actor [Game_Actor] the member
   def self.write_character(actor)
@@ -118,8 +121,14 @@ module MGQ_PartySheet
     Dir.mkdir(path(FOLDER)) unless File.directory?(path(FOLDER))
     name = "#{CHARACTER_FILE}_#{file_name(actor.name)}"
     image = sheet("#{name}.png")
-    upload = Options.upload? ? [image, image, sheet("#{name}.url")] : nil
-    started = Browser.run(nil, nil, [[Page.character(actor, Browser.base), image]], upload)
+    shots = [[Page.character(actor, Browser.base), image]]
+    upload = nil
+    if Options.upload?
+      upload_image = Browser.work_path(Browser::UPLOAD_IMAGE)
+      shots << [Page.character(actor, Browser.base, true), upload_image]
+      upload = [upload_image, image, sheet("#{name}.url")]
+    end
+    started = Browser.run(nil, nil, shots, upload)
     started ? Sound.play_save : Sound.play_buzzer
   rescue => e
     log("could not write the sheet of #{actor.name}: #{e.class}: #{e.message}")
@@ -1707,8 +1716,12 @@ module MGQ_PartySheet
     # Script that drives the browser, inside WORK_DIR.
     SCRIPT_FILE = "Browser.ps1"
 
-    # Page built only to be uploaded, inside WORK_DIR, while Output writes no page.
+    # Copy of the page that is uploaded, with faces instead of pictures, inside WORK_DIR.
     UPLOAD_FILE = "Upload.html"
+
+    # Copy of a member's image that is uploaded, with her face instead of her picture, inside
+    # WORK_DIR.
+    UPLOAD_IMAGE = "Upload.png"
 
     # Replaces each portrait with its WebP, once the page has loaded, unless the WebP comes out
     # larger. The script then takes itself out, puts back the page's policy and marks the body, so
@@ -1807,7 +1820,7 @@ if ($Upload) {
       convert = page && EMBED_IMAGES && PORTRAIT_QUALITY
       if (convert || !shots.empty?) && !browser
         MGQ_PartySheet.log("no Microsoft Edge or Google Chrome found to convert the portraits or take the images")
-        return false unless upload && page
+        return false unless upload && shots.none? { |_html, image| image == upload[0] }
         convert = false
         shots = []
       end
@@ -2329,9 +2342,12 @@ body{margin:0;background:var(--bg)}
 
     # The body is built before the head, which carries the icons the body shows.
     #
+    # @param faces [Boolean] whether every member shows her face instead of her picture, as the
+    #   uploaded copy does
     # @return [String] the whole page
-    def self.build
+    def self.build(faces = false)
       @icons = {}
+      @faces = faces
       body = ['<body><div class="page">',
               MGQ_PartySheet.safely("header") { header },
               group("Frontline", Party.front),
@@ -2353,6 +2369,7 @@ body{margin:0;background:var(--bg)}
     # @return [String] the image's page
     def self.frontline(base)
       @icons = {}
+      @faces = false
       actors = Party.front
       columns = "grid-template-columns:repeat(#{actors.size},#{CARD_WIDTH}px)"
       shot = "<section class=\"shot\">#{MGQ_PartySheet.safely('header') { header }}#{heading('Frontline', actors.size)}" \
@@ -2368,9 +2385,12 @@ body{margin:0;background:var(--bg)}
     #
     # @param actor [Game_Actor] the member
     # @param base [String, nil] the address linked images are relative to, nil when they are embedded
+    # @param faces [Boolean] whether she shows her face instead of her picture, as the uploaded copy
+    #   does
     # @return [String] the image's page
-    def self.character(actor, base)
+    def self.character(actor, base, faces = false)
       @icons = {}
+      @faces = faces
       name = actor.name
       columns = [
         [portrait(actor),
@@ -2648,13 +2668,13 @@ body{margin:0;background:var(--bg)}
       "<div class=\"portrait\">#{MGQ_PartySheet.safely("picture of #{actor.name}") { art(actor) }}#{title}</div>"
     end
 
-    # Shows the Library's picture of a member, her face when the picture is missing or packed inside
-    # Game.rgss3a, her initial when the face cannot be shown either.
+    # Shows the Library's picture of a member, her face on an uploaded copy or when the picture is
+    # missing or packed inside Game.rgss3a, her initial when the face cannot be shown either.
     #
     # @param actor [Game_Actor] the member
     # @return [String] the image
     def self.art(actor)
-      picture = Party.picture(actor)
+      picture = @faces ? nil : Party.picture(actor)
       return "<img src=\"#{Images.file(picture)}\" alt=\"\">" if picture
 
       face(actor) || "<div class=\"initial\">#{Text.html(actor.name[0, 1])}</div>"

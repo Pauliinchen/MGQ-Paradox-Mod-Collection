@@ -56,7 +56,7 @@ Set **[Party Sheet] Upload** to **Public** or **Link Only**, and every sheet you
 - **Public**: listed in the gallery for everyone, blurred as a spoiler until someone clicks it.
 - **Link Only**: not listed; only whoever has the link can open it.
 
-The whole party is uploaded as its page, even while Output writes only the image, and a character image as that image. A few seconds after writing, the sheet's link is on your clipboard, ready to paste, and in a shortcut next to the sheet, like `05_party_sheet.url` or `05_party_sheet_Alice.url`.
+The whole party is uploaded as a copy of its page, even while Output writes only the image, and a character image as a copy of that image. The uploaded copies show each character's face instead of her picture from the Library; the page and images in `Party sheets` keep the pictures. A few seconds after writing, the sheet's link is on your clipboard, ready to paste, and in a shortcut next to the sheet, like `05_party_sheet.url` or `05_party_sheet_Alice.url`.
 
 Uploaded sheets are deleted automatically after 7 days, and you can't delete them earlier. The page shows your party with its play time, gold and location, nothing else about you or your computer. Upload is **Off** by default.
 
