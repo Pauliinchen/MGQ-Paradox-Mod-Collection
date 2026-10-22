@@ -2,6 +2,7 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-22: Showed the whole face where a member has no picture
 #      Paulinchen  2026-10-17: Added an Upload option that shares each written sheet on mgqonline.org for 7 days
 #      Paulinchen  2026-10-06: Wrote the log into the game folder's Logs folder
 #      Paulinchen  2026-10-03: Showed what skills really cost in HP, MP and SP, priced the way the game does
@@ -2125,6 +2126,7 @@ body{margin:0;background:radial-gradient(1200px 600px at 50% -200px,var(--glow),
 .portrait{position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:13px 13px 0 0;background:radial-gradient(circle at 50% 65%,var(--halo),var(--card) 70%);border-bottom:1px solid var(--line)}
 .portrait img{display:block;width:100%;height:100%;object-fit:contain}
 .face{width:96px;height:96px;transform:scale(2);background-repeat:no-repeat}
+.portrait img.face{width:96px;height:96px}
 .initial{font:600 120px Georgia,serif;color:var(--line)}
 .title{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:baseline;gap:10px;padding:32px 16px 10px;background:linear-gradient(transparent,var(--shade))}
 .title h3{margin:0;font:600 24px Georgia,serif;text-shadow:var(--name-shadow)}
