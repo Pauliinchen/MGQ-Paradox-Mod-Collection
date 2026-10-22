@@ -2,6 +2,7 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-17: Added an Upload option that shares each written sheet on mgqonline.org for 7 days
 #      Paulinchen  2026-10-06: Wrote the log into the game folder's Logs folder
 #      Paulinchen  2026-10-03: Showed what skills really cost in HP, MP and SP, priced the way the game does
 #                            - Listed skill chains, with the damage and cost of chained skills
@@ -51,6 +52,13 @@ module MGQ_PartySheet
   # 05_party_sheet_Alice.png.
   CHARACTER_FILE = "party_sheet"
 
+  # Shortcut to the uploaded page written next to the page after the save's name, like
+  # 05_party_sheet.url. A member's image gets one after her name, like 05_party_sheet_Alice.url.
+  LINK_FILE = "party_sheet.url"
+
+  # Address the Upload option sends the sheets to, which answers with the sheet's address.
+  UPLOAD_URL = "https://mgqonline.org/api/sheets"
+
   # Folder next to Game.exe that holds the logs, shared with the user's other mods.
   LOG_DIR = "Logs"
 
@@ -70,8 +78,12 @@ module MGQ_PartySheet
     !Scene_Base.method_defined?(:mgq_party_sheet_update_basic)
   end
 
-  # Writes what the Output option asks for, for the party that is loaded, and plays the save sound
-  # when it did, the buzzer when no game is loaded.
+  # Writes what the Output option asks for, for the party that is loaded, uploads the page when the
+  # Upload option asks for it, and plays the save sound when it did, the buzzer when no game is
+  # loaded.
+  #
+  # The site takes the whole party as a page only, so the page is built for the upload even while
+  # Output is Image, and then kept in the temporary folder instead of Party sheets.
   def self.write
     return unless ENABLED
 
@@ -81,23 +93,32 @@ module MGQ_PartySheet
     end
 
     Dir.mkdir(path(FOLDER)) unless File.directory?(path(FOLDER))
-    page = Options.page? ? Page.build : nil
-    File.open(sheet(FILE), "wb") { |file| file.write(page) } if page
-    Browser.run(page, Options.image? ? [[Page.frontline(Browser.base), sheet(IMAGE_FILE)]] : [])
+    # The site refuses a page that links its images rather than carrying them.
+    upload = Options.upload? && EMBED_IMAGES
+    page = Options.page? || upload ? Page.build : nil
+    page_file = Options.page? ? sheet(FILE) : Browser.work_path(Browser::UPLOAD_FILE)
+    Browser.prepare
+    File.open(page_file, "wb") { |file| file.write(page) } if page
+    shots = Options.image? ? [[Page.frontline(Browser.base), sheet(IMAGE_FILE)]] : []
+    Browser.run(page, page_file, shots, upload ? [page_file, sheet(FILE), sheet(LINK_FILE)] : nil)
     Sound.play_save
   rescue => e
     log("could not write the party sheet: #{e.class}: #{e.message}")
   end
 
-  # Takes the image of one member, with everything her card holds, and plays the save sound when
-  # the browser started, the buzzer when it could not.
+  # Takes the image of one member, with everything her card holds, uploads it when the Upload
+  # option asks for it, and plays the save sound when the browser started, the buzzer when it
+  # could not.
   #
   # @param actor [Game_Actor] the member
   def self.write_character(actor)
     return unless ENABLED
 
     Dir.mkdir(path(FOLDER)) unless File.directory?(path(FOLDER))
-    started = Browser.run(nil, [[Page.character(actor, Browser.base), sheet("#{CHARACTER_FILE}_#{file_name(actor.name)}.png")]])
+    name = "#{CHARACTER_FILE}_#{file_name(actor.name)}"
+    image = sheet("#{name}.png")
+    upload = Options.upload? ? [image, image, sheet("#{name}.url")] : nil
+    started = Browser.run(nil, nil, [[Page.character(actor, Browser.base), image]], upload)
     started ? Sound.play_save : Sound.play_buzzer
   rescue => e
     log("could not write the sheet of #{actor.name}: #{e.class}: #{e.message}")
@@ -312,13 +333,17 @@ module MGQ_PartySheet
   end
 
   # The mod's entries in the Mod Config Menu when it is installed, in the game's Config menu
-  # otherwise: what to write, a button and a hotkey that write it, and the page's colours.
+  # otherwise: what to write, a button and a hotkey that write it, whether to upload it, and the
+  # page's colours.
   module Options
     # What the sheet writes: 0 the page and the image, 1 the page, 2 the image.
     OUTPUT = :mod_party_sheet_output
 
     # The button that writes the sheet.
     WRITE = :mod_party_sheet_write
+
+    # Whether each written sheet is uploaded: 0 not, 1 listed in the gallery, 2 for whoever has the link.
+    UPLOAD = :mod_party_sheet_upload
 
     # The key that writes the sheet anywhere in the game, by its Windows code, 0 for none.
     HOTKEY = :mod_party_sheet_hotkey
@@ -341,6 +366,16 @@ module MGQ_PartySheet
       1 => ["Page",           "A page with the whole party."],
       2 => ["Image",          "An image of the Frontline."],
     }
+
+    # Upload's values by their name and help in the menu. The first one is the default.
+    UPLOADS = {
+      0 => ["Off",       "The sheet stays on your computer."],
+      1 => ["Public",    "Listed in the gallery for everyone, blurred as a spoiler until clicked."],
+      2 => ["Link Only", "Not listed; only whoever has the link can open it."],
+    }
+
+    # Upload's values by how the site names them.
+    VISIBILITIES = { 1 => "public", 2 => "unlisted" }
 
     # Hotkey's values in menus without key bindings, Windows key codes, by the key's name. The first
     # one is the default in every menu.
@@ -375,6 +410,9 @@ module MGQ_PartySheet
       add(OUTPUT, "[Party Sheet] Output", "What the party sheet writes into the Party sheets folder.", OUTPUTS)
       @menu.insert(-2, :key => WRITE, :name => "     -> Write Party Sheet", :sub => false,
                        :help => "Write the party sheet now. The key picked under Hotkey does the same anywhere in the game.")
+      add(UPLOAD, "[Party Sheet] Upload",
+          "Shares each written sheet on mgqonline.org for 7 days, the whole party as its page. The link is copied and kept next to the sheet.",
+          UPLOADS)
       add_hotkey
       @theme = add(THEME, "[Party Sheet] Theme", "The colours of the party sheet.", THEMES)
       @shown_theme = add(SHOWN_THEME, "     -> Shown Theme", "The colours of the party sheet while Theme is Static.", SHOWN_THEMES)
@@ -479,6 +517,16 @@ module MGQ_PartySheet
     # @return [Boolean] whether the sheet takes the image of the Frontline
     def self.image?
       value(OUTPUT) != 1
+    end
+
+    # @return [Boolean] whether each written sheet is uploaded
+    def self.upload?
+      VISIBILITIES.key?(value(UPLOAD))
+    end
+
+    # @return [String, nil] who may see an uploaded sheet, as the site names it, nil while nothing is uploaded
+    def self.visibility
+      VISIBILITIES[value(UPLOAD)]
     end
 
     # @return [Boolean] whether the colours are always the ones of Shown Theme
@@ -1658,6 +1706,9 @@ module MGQ_PartySheet
     # Script that drives the browser, inside WORK_DIR.
     SCRIPT_FILE = "Browser.ps1"
 
+    # Page built only to be uploaded, inside WORK_DIR, while Output writes no page.
+    UPLOAD_FILE = "Upload.html"
+
     # Replaces each portrait with its WebP, once the page has loaded, unless the WebP comes out
     # larger. The script then takes itself out, puts back the page's policy and marks the body, so
     # the page the browser dumps is the page without it.
@@ -1674,9 +1725,12 @@ module MGQ_PartySheet
     # WebP, which then replaces the page. The dump joins the html and head tags and leaves blank
     # lines where CONVERT_SCRIPT was, which the script mends. Takes the images: the browser measures
     # what each page shows, which the page reports on its body, then takes a screenshot at exactly
-    # that size, as a screenshot holds the browser's window and no more.
+    # that size, as a screenshot holds the browser's window and no more. Uploads last, so the page is
+    # converted and the image taken: the site answers with the sheet's address, which goes to the
+    # clipboard and into a shortcut.
     SCRIPT = <<-'PS1'
-param([string]$Browser, [string]$UserData, [string]$Log, [string]$Convert, [string]$Page, [string]$Shots)
+param([string]$Browser, [string]$UserData, [string]$Log, [string]$Convert, [string]$Page, [string]$Shots,
+      [string]$Upload, [string]$Visibility, [string]$UploadFile, [string]$UploadName, [string]$LinkFile)
 $common = @('--headless', '--disable-gpu', '--no-first-run', '--hide-scrollbars', "--user-data-dir=$UserData")
 if ($Convert) {
   try {
@@ -1708,23 +1762,57 @@ if ($Shots) {
     }
   }
 }
+if ($Upload) {
+  try {
+    if (-not (Test-Path -LiteralPath $UploadFile)) { throw 'the file to upload was not written' }
+    Add-Type -AssemblyName System.Net.Http
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $isPage = $UploadFile.EndsWith('.html')
+    $file = New-Object Net.Http.ByteArrayContent (,[IO.File]::ReadAllBytes($UploadFile))
+    $file.Headers.ContentType = New-Object Net.Http.Headers.MediaTypeHeaderValue $(if ($isPage) { 'text/html' } else { 'image/png' })
+    $form = New-Object Net.Http.MultipartFormDataContent
+    $form.Add((New-Object Net.Http.StringContent $Visibility), 'visibility')
+    $form.Add($file, $(if ($isPage) { 'page' } else { 'image' }), $UploadName)
+    $client = New-Object Net.Http.HttpClient
+    $client.Timeout = [TimeSpan]::FromSeconds(120)
+    $response = $client.PostAsync($Upload, $form).Result
+    $body = $response.Content.ReadAsStringAsync().Result
+    if (-not $response.IsSuccessStatusCode) { throw "the site answered $([int]$response.StatusCode) $body" }
+    $url = ($body | ConvertFrom-Json).url
+    if ($url -notmatch '^https://[^\s]+$') { throw "the site answered no address: $body" }
+    [IO.File]::WriteAllText($LinkFile, "[InternetShortcut]`r`nURL=$url`r`n", [Text.Encoding]::ASCII)
+    Set-Clipboard -Value $url
+  } catch {
+    Add-Content -LiteralPath $Log -Value "$(Get-Date)  upload of $UploadName failed: $_"
+  }
+}
     PS1
 
-    # Writes what the browser needs and starts the script.
+    # Makes WORK_DIR when it is missing.
+    def self.prepare
+      Dir.mkdir(work_path("")) unless File.directory?(work_path(""))
+    end
+
+    # Writes what the browser needs and starts the script. The browser is only needed to convert
+    # and to take images, an upload alone runs without one.
     #
     # @param page [String, nil] the page just written, nil when none was
+    # @param page_file [String, nil] the path the page was written to, nil when none was
     # @param shots [Array<Array(String, String)>] the page and the path of each image to take
-    # @return [Boolean] whether the browser was started
-    def self.run(page, shots)
+    # @param upload [Array(String, String, String), nil] the path of the file to upload, the path whose
+    #   name it is uploaded under and the path of the shortcut to its address, nil to upload nothing
+    # @return [Boolean] whether the script was started
+    def self.run(page, page_file, shots, upload)
       convert = page && EMBED_IMAGES && PORTRAIT_QUALITY
-      return false unless convert || !shots.empty?
-
-      unless browser
+      if (convert || !shots.empty?) && !browser
         MGQ_PartySheet.log("no Microsoft Edge or Google Chrome found to convert the portraits or take the images")
-        return false
+        return false unless upload && page
+        convert = false
+        shots = []
       end
+      return false unless convert || !shots.empty? || upload
 
-      Dir.mkdir(work_path("")) unless File.directory?(work_path(""))
+      prepare
       File.open(work_path(CONVERT_FILE), "wb") { |file| file.write(converting(page)) } if convert
       list = shots.each_with_index.map do |(html, image), index|
         file = work_path(format(SHOT_FILE, index + 1))
@@ -1733,11 +1821,25 @@ if ($Shots) {
       end
       File.open(work_path(SHOTS_FILE), "wb") { |file| file.write(list.join("\r\n")) }
       File.open(work_path(SCRIPT_FILE), "wb") { |file| file.write(SCRIPT) }
+      forget(upload, shots) if upload
 
-      result = shell_execute.call(0, Wide.string("open"), Wide.string("powershell.exe"), Wide.string(arguments(convert, !list.empty?)),
+      result = shell_execute.call(0, Wide.string("open"), Wide.string("powershell.exe"),
+                                  Wide.string(arguments(convert && page_file, !list.empty?, upload)),
                                   Wide.string(windows_path(MGQ_PartySheet.game_dir)), 0)
       MGQ_PartySheet.log("could not start PowerShell: error #{result}") if result <= 32
       result > 32
+    end
+
+    # Deletes the shortcut of the last upload, and the image to upload when it is about to be taken,
+    # so a failed upload or image leaves no old address and uploads no old image.
+    #
+    # @param upload [Array(String, String, String)] what run uploads
+    # @param shots [Array<Array(String, String)>] the images run takes
+    def self.forget(upload, shots)
+      file, _name, link = upload
+      stale = [link]
+      stale << file if shots.any? { |_html, image| image == file }
+      stale.each { |path| File.delete(path) if File.exist?(path) }
     end
 
     # The page's policy forbids scripts, so the copy allows inline ones until CONVERT_SCRIPT puts
@@ -1750,17 +1852,22 @@ if ($Shots) {
       page.sub(Page::POLICY, "#{Page::POLICY}; script-src 'unsafe-inline'").sub("</body>", "#{script}</body>")
     end
 
-    # @param convert [Boolean] whether to convert the page's portraits
+    # @param page_file [String, nil] the page whose portraits to convert, nil to convert none
     # @param shots [Boolean] whether to take the images SHOTS_FILE lists
+    # @param upload [Array(String, String, String), nil] what to upload, as run takes it
     # @return [String] PowerShell's command line, running the script
-    def self.arguments(convert, shots)
+    def self.arguments(page_file, shots, upload)
       arguments = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy Bypass", "-WindowStyle Hidden",
                    "-File #{quoted(work_path(SCRIPT_FILE))}",
-                   "-Browser #{quoted(browser)}",
-                   "-UserData #{quoted(work_path('Browser'))}",
                    "-Log #{quoted(MGQ_PartySheet.log_file)}"]
-      arguments += ["-Convert #{quoted(work_path(CONVERT_FILE))}", "-Page #{quoted(MGQ_PartySheet.sheet(FILE))}"] if convert
+      arguments += ["-Browser #{quoted(browser)}", "-UserData #{quoted(work_path('Browser'))}"] if browser
+      arguments += ["-Convert #{quoted(work_path(CONVERT_FILE))}", "-Page #{quoted(page_file)}"] if page_file
       arguments += ["-Shots #{quoted(work_path(SHOTS_FILE))}"] if shots
+      if upload
+        file, name, link = upload
+        arguments += ["-Upload #{UPLOAD_URL}", "-Visibility #{Options.visibility}", "-UploadFile #{quoted(file)}",
+                      "-UploadName #{quoted(File.basename(name))}", "-LinkFile #{quoted(link)}"]
+      end
       arguments.join(" ")
     end
 

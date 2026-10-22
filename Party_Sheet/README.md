@@ -49,12 +49,24 @@ Press **P** while a character's status screen is open to write an image of that 
 
 Like the Frontline image, it is taken by Edge or Chrome in the background and appears a few seconds later.
 
+## Sharing on mgqonline.org
+
+Set **[Party Sheet] Upload** to **Public** or **Link Only**, and every sheet you write is also uploaded to the [party sheet gallery](https://mgqonline.org/sheets), with no account needed:
+
+- **Public**: listed in the gallery for everyone, blurred as a spoiler until someone clicks it.
+- **Link Only**: not listed; only whoever has the link can open it.
+
+The whole party is uploaded as its page, even while Output writes only the image, and a character image as that image. A few seconds after writing, the sheet's link is on your clipboard, ready to paste, and in a shortcut next to the sheet, like `05_party_sheet.url` or `05_party_sheet_Alice.url`.
+
+Uploaded sheets are deleted automatically after 7 days, and you can't delete them earlier. The page shows your party with its play time, gold and location, nothing else about you or your computer. Upload is **Off** by default.
+
 ## Options
 
 With [Mod Config Remake](../0_ModConfigRemake) or the Mod Config Menu installed, the options are there, otherwise at the end of the game's Config menu:
 
 - **[Party Sheet] Output**: write the page and the image, only the page, or only the image.
 - **Write Party Sheet**: writes it right away, like the hotkey.
+- **[Party Sheet] Upload**: **Off** (default), **Public** or **Link Only**, see [Sharing on mgqonline.org](#sharing-on-mgqonlineorg).
 - **[Party Sheet] Hotkey**: the hotkey that writes the sheet anywhere in the game, **P** by default. In Mod Config Remake 1.3.0 or later, confirm it and press the new key; the menu refuses the game's own keys and keys another mod's hotkey already has. In other menus, pick among the letters the game leaves free (P, O, I, U, K, L, M, N, J, H, G), Tab, Insert, Home, End, or **None** to write it only with the button. While another mod takes typed text, such as a chat, the hotkey does nothing.
 - **[Party Sheet] Theme**: the colours of the page and the image.
   - **Dynamic** (default): white and gold if you chose Ilias, dark and purple if you chose Alice. Before you choose, it stays dark.
@@ -72,10 +84,10 @@ To uninstall, delete `Patch\Party_Sheet.rb`, and the `Party sheets` folder in th
 These are constants at the top of `Party_Sheet.rb`. Open it in any text editor to change them.
 
 - `ENABLED`: turns the mod off without uninstalling it.
-- `EMBED_IMAGES`: set to `false` for a much smaller page that loads its images from the game folder instead. It then only works while it stays in the `Party sheets` folder.
+- `EMBED_IMAGES`: set to `false` for a much smaller page that loads its images from the game folder instead. It then only works while it stays in the `Party sheets` folder, and the page is no longer uploaded.
 - `PORTRAIT_QUALITY`: the WebP quality of the portraits, from 0 to 1, `0.85` by default. Set it to `nil` to keep the game's PNGs.
 
-If something is missing from the page or no image appears, `Logs\Party Sheet.log` in the game folder says why.
+If something is missing from the page, no image appears or an upload fails, `Logs\Party Sheet.log` in the game folder says why.
 
 ## Compatibility
 
