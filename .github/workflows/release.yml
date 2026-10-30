@@ -1,7 +1,6 @@
 # Publishing a release on GitHub (tag e.g. v1.0.0) attaches every mod's .rb to that release, so the
 # README's download links, which point at the latest release, always find each mod. Nothing to
-# upload by hand, and a new mod folder is picked up on its own. Luka Replacer is attached only as a
-# zip, with its hero files in a Patch folder, to extract into the game folder.
+# upload by hand, and a new mod folder is picked up on its own.
 name: Release
 
 on:
@@ -17,17 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Zip Luka Replacer with its heroes
-        run: |
-          stage="$RUNNER_TEMP/stage"
-          mkdir -p "$stage/Patch/Luka_Replacer/Heroes"
-          cp Luka_Replacer/Luka_Replacer.rb "$stage/Patch/"
-          cp Luka_Replacer/Heroes/*.luka "$stage/Patch/Luka_Replacer/Heroes/"
-          (cd "$stage" && zip -r -X "$GITHUB_WORKSPACE/Luka_Replacer.zip" .)
-
       - name: Attach every mod to the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          scripts=$(ls */*.rb | grep -v '^Luka_Replacer/')
-          gh release upload "${{ github.event.release.tag_name }}" $scripts Luka_Replacer.zip --clobber
+          gh release upload "${{ github.event.release.tag_name }}" */*.rb --clobber
