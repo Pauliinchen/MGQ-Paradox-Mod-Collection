@@ -34,7 +34,7 @@ Caps your characters' base level until the next story boss falls, and lets each 
 
 ## Options
 
-With [Mod Config Remake](../0_ModConfigRemake) or the Mod Config Menu, **Level Cap** in the mod options turns the cap on or off, and **Job and Race Points** below it the points and slots. Both are on by default and are kept in each save.
+With the [Mod Framework](https://mgqonline.org/mods/mod-framework) or the Mod Config Menu, **Level Cap** in the mod options turns the cap on or off, and **Job and Race Points** below it the points and slots. Both are on by default and are kept in each save.
 
 ## Bosses
 

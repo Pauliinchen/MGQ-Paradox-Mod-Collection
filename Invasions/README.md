@@ -14,7 +14,7 @@ Lets more monsters of the area join a random encounter or a boss fight while you
 
 ## Options
 
-With [Mod Config Remake](../0_ModConfigRemake) or the Mod Config Menu, **Invasion Chance** under **Invasions** in the mod options sets the chance after each turn, from **Off** to **100%**, **Invasions per Battle** below it how many invasions a battle gets at most, from **1** to **5**, and **In Boss Battles** whether story boss fights, including optional ones, get invasions too. They are **5%**, **2** and **On** by default and are kept in each save.
+With the [Mod Framework](https://mgqonline.org/mods/mod-framework) or the Mod Config Menu, **Invasion Chance** under **Invasions** in the mod options sets the chance after each turn, from **Off** to **100%**, **Invasions per Battle** below it how many invasions a battle gets at most, from **1** to **5**, and **In Boss Battles** whether story boss fights, including optional ones, get invasions too. They are **5%**, **2** and **On** by default and are kept in each save.
 
 ## Settings
 

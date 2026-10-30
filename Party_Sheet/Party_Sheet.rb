@@ -2,6 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-10-30: Made Hotkey a key binding only where the Mod Framework's DLL works
+#                            - Showed or hid Shown Theme at once in the Mod Framework's options
 #      Paulinchen  2026-10-22: Uploaded the page and the character image with faces instead of pictures
 #                            - Showed the whole face where a member has no picture
 #      Paulinchen  2026-10-17: Added an Upload option that shares each written sheet on mgqonline.org for 7 days
@@ -425,6 +427,7 @@ module MGQ_PartySheet
           UPLOADS)
       add_hotkey
       @theme = add(THEME, "[Party Sheet] Theme", "The colours of the party sheet.", THEMES)
+      @theme[:on_change] = lambda { |_value| theme_changed }
       @shown_theme = add(SHOWN_THEME, "     -> Shown Theme", "The colours of the party sheet while Theme is Static.", SHOWN_THEMES)
 
       arrange
@@ -450,17 +453,28 @@ module MGQ_PartySheet
       entry
     end
 
-    # Adds Hotkey before the menu's last entry: a key binding, which takes the next key pressed, in
-    # Mod Config Remake 1.3.0 or later, else a choice among HOTKEYS.
+    # Adds Hotkey before the menu's last entry: a key binding, which takes the next key pressed,
+    # where the menu binds keys, else a choice among HOTKEYS.
     #
-    # Older menus show a key binding as a button that does nothing.
+    # Older menus show a key binding as a button that does nothing, and the game's options, which
+    # get the rows while the Mod Framework runs without its DLL, leave it out.
     def self.add_hotkey
       name = "[Party Sheet] Hotkey"
       help = "The key that writes the party sheet anywhere in the game."
-      return add(HOTKEY, name, help, hotkey_values) unless defined?(ModConfigRemake::Keys)
+      return add(HOTKEY, name, help, hotkey_values) unless key_bindings?
 
       @menu.insert(-2, :key => HOTKEY, :name => name, :help => help, :keybind => true)
       NWConst::Config::DEFAULT[HOTKEY] = HOTKEYS.keys.first
+    end
+
+    # Tells whether the menu binds keys: the Mod Framework's while its DLL works, else Mod Config
+    # Remake 1.3.0 or later.
+    #
+    # @return [Boolean] whether it does
+    def self.key_bindings?
+      return Mod_Framework.available? if defined?(Mod_Framework)
+
+      defined?(ModConfigRemake::Keys) ? true : false
     end
 
     # @return [Hash{Integer => Array(String, String)}] HOTKEYS by their name and help in the menu
@@ -486,6 +500,15 @@ module MGQ_PartySheet
         @menu.insert(@menu.index { |item| item.equal?(@theme) } + 1, @shown_theme)
       end
       true
+    end
+
+    # Shows or hides Shown Theme as Theme changes in the Mod Framework's options, which refresh none
+    # of the config windows that arrange it otherwise.
+    def self.theme_changed
+      return unless arrange
+
+      scene = SceneManager.scene
+      scene.refresh_mod_config if scene.respond_to?(:refresh_mod_config)
     end
 
     # Reads an option as the menu currently shows it.

@@ -62,12 +62,12 @@ Uploaded sheets are deleted automatically after 7 days, and you can't delete the
 
 ## Options
 
-With [Mod Config Remake](../0_ModConfigRemake) or the Mod Config Menu installed, the options are there, otherwise at the end of the game's Config menu:
+With the [Mod Framework](https://mgqonline.org/mods/mod-framework) or the Mod Config Menu installed, the options are in the mod options, otherwise at the end of the game's Config menu:
 
 - **[Party Sheet] Output**: write the page and the image, only the page, or only the image.
 - **Write Party Sheet**: writes it right away, like the hotkey.
 - **[Party Sheet] Upload**: **Off** (default), **Public** or **Link Only**, see [Sharing on mgqonline.org](#sharing-on-mgqonlineorg).
-- **[Party Sheet] Hotkey**: the hotkey that writes the sheet anywhere in the game, **P** by default. In Mod Config Remake 1.3.0 or later, confirm it and press the new key; the menu refuses the game's own keys and keys another mod's hotkey already has. In other menus, pick among the letters the game leaves free (P, O, I, U, K, L, M, N, J, H, G), Tab, Insert, Home, End, or **None** to write it only with the button. While another mod takes typed text, such as a chat, the hotkey does nothing.
+- **[Party Sheet] Hotkey**: the hotkey that writes the sheet anywhere in the game, **P** by default. With the Mod Framework, confirm it and press the new key; it refuses the game's own keys and keys another mod's hotkey already has. In other menus, and while the Mod Framework runs without its DLL, pick among the letters the game leaves free (P, O, I, U, K, L, M, N, J, H, G), Tab, Insert, Home, End, or **None** to write it only with the button. While another mod takes typed text, such as a chat, the hotkey does nothing.
 - **[Party Sheet] Theme**: the colours of the page and the image.
   - **Dynamic** (default): white and gold if you chose Ilias, dark and purple if you chose Alice. Before you choose, it stays dark.
   - **Static**: always the same colours, the ones picked under **`-> Shown Theme`**: **Alice (Dark)** (default) or **Ilias (Light)**.
