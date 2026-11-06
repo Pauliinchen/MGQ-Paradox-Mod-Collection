@@ -2,127 +2,75 @@
 #  Map_Display.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-06: Drew the map name through the Mod Framework's UI layer
+#                            - Slid the name in and out
 #      Paulinchen  2026-09-27: Created
 #
 #----------------------------------------------------------------
 
-# Shows the name of the map in the top left corner for a few seconds after each map change, in the
-# style of Now Playing with the coloured bar on the right.
-#
-# Scene_Map opens the window after each map change and closes it before the next, so only its
-# drawing and movement are replaced.
-class Window_MapName
-  # Frames the box takes to slide in.
-  SLIDE_FRAMES = 15
+# Shows the name of the map in the top left corner for a few seconds after each map change.
+module Map_Display
+  # Seconds the name stays before it slides out.
+  SECONDS = 3
 
-  # Frames the box stays fully visible, 3 seconds at 60 frames per second.
-  HOLD_FRAMES = 180
+  # Folder next to Game.exe that holds the logs, shared with the user's other mods.
+  LOG_DIR = "Logs"
 
-  # Frames the box takes to fade out.
-  FADE_FRAMES = 30
+  # Log in LOG_DIR, which only appears when the Mod Framework is missing.
+  LOG_FILE = "Map Display.log"
 
-  # Gap between the box and the edges of the screen.
-  MARGIN = 8
-
-  # Space between the text and the edges of the box.
-  PADDING = 10
-
-  # Height of the box.
-  HEIGHT = 30
-
-  # Width of the coloured bar on the right of the box.
-  ACCENT_WIDTH = 3
-
-  # Size of the text.
-  FONT_SIZE = 20
-
-  # Color of the box behind the text.
-  BACKGROUND_COLOR = Color.new(0, 0, 0, 170)
-
-  # Color of the bar on the right of the box.
-  ACCENT_COLOR = Color.new(255, 200, 120)
-
-  # Creates the window, hidden until the first map change.
-  def initialize
-    super(0, MARGIN, 1, HEIGHT)
-    self.opacity = 0
-    stop
-  end
-
-  # Leaves no room between the edge of the window and its contents, so the window is the box.
+  # Writes a line to the log.
   #
-  # @return [Integer] 0
-  def standard_padding
-    0
+  # @param message [String] What happened.
+  def self.log(message)
+    Dir.mkdir(LOG_DIR) unless File.directory?(LOG_DIR)
+    File.open("#{LOG_DIR}/#{LOG_FILE}", "ab") { |file| file.write("#{Time.now}  #{message}\n") }
+  rescue
   end
+end
 
-  # Moves the box on by one frame. Called once per frame from Scene_Map.
-  def update
-    super
-    return unless @frame
+if defined?(Mod_Framework::UI.replace_window)
+  module Map_Display
+    # Short name for the framework's UI module.
+    UI = Mod_Framework::UI
 
-    close unless $game_map.name_display
-    @frame += 1
-    if @frame >= SLIDE_FRAMES + HOLD_FRAMES + FADE_FRAMES
-      stop
-    else
-      place
+    # The map name with an accent bar at its right, drawn in place of the game's map name window.
+    class Banner < UI::Component
+      # The game's map name window, which the game opens after each map change.
+      param :game_window
+
+      # Notes how often the game drew its window so far, so only a later drawing shows the name.
+      def setup
+        @refreshes = game_window.refreshes
+      end
+
+      # Describes the name on a box that slides in after a map change and out after SECONDS.
+      def render
+        hud anchor: :top_left, order: 50, id: :map_display, place_name: "Map name", enter: :slide,
+            hide_while: -> { hidden? } do
+          stack row: true do
+            text UI::Game.map_name, typo: :subtitle1
+            divider vertical: true, color: :primary, thickness: 3, align_self: :stretch
+          end
+        end
+      end
+
+      # Tells whether the name hides now. Asked every frame, it also starts the seconds once the game
+      # draws its window anew, which it does as it opens the window after a map change.
+      #
+      # @return [Boolean] Whether it hides.
+      def hidden?
+        if game_window.refreshes != @refreshes
+          @refreshes = game_window.refreshes
+          @opened_at = Graphics.frame_count
+        end
+        @opened_at.nil? || !$game_map.name_display || $game_map.display_name.empty? ||
+          Graphics.frame_count - @opened_at >= SECONDS * Graphics.frame_rate
+      end
     end
+
+    UI.replace_window Window_MapName, Banner
   end
-
-  # Starts showing the name of the map the player just arrived on. Maps without a name show nothing.
-  #
-  # @return [Window_MapName] self
-  def open
-    name = $game_map.display_name
-    if name.empty? || !$game_map.name_display
-      stop
-    else
-      draw_box(name)
-      @frame = 0
-      self.visible = true
-      place
-    end
-    self
-  end
-
-  # Starts fading the box out, unless it already is.
-  #
-  # @return [Window_MapName] self
-  def close
-    @frame = [@frame, SLIDE_FRAMES + HOLD_FRAMES].max if @frame
-    self
-  end
-
-  # Hides the box until the next map change.
-  def stop
-    self.visible = false
-    @frame = nil
-  end
-
-  # Places the box for the current frame: sliding in, holding, then fading out.
-  #
-  # Named place because Window#move already exists and takes a rectangle.
-  def place
-    slide = [@frame.to_f / SLIDE_FRAMES, 1.0].min
-    self.x = MARGIN - ((width + MARGIN) * (1.0 - slide) ** 2).round
-
-    fading = @frame - SLIDE_FRAMES - HOLD_FRAMES
-    self.contents_opacity = fading > 0 ? 255 - 255 * fading / FADE_FRAMES : 255
-  end
-
-  # Resizes the window to fit a map name and draws the box around it.
-  #
-  # @param name [String] the map name
-  def draw_box(name)
-    contents.font.size = FONT_SIZE
-    text_width = contents.text_size(name).width
-
-    self.width = text_width + PADDING * 2 + ACCENT_WIDTH
-    create_contents
-    contents.font.size = FONT_SIZE
-    contents.fill_rect(contents.rect, BACKGROUND_COLOR)
-    contents.fill_rect(width - ACCENT_WIDTH, 0, ACCENT_WIDTH, HEIGHT, ACCENT_COLOR)
-    contents.draw_text(PADDING, 0, text_width + PADDING, HEIGHT, name)
-  end
+else
+  Map_Display.log("Map Display needs the Mod Framework, which is missing or too old, so the game shows its own map name.")
 end
