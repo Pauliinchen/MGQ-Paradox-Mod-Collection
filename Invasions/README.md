@@ -20,6 +20,10 @@ With the [Mod Framework](https://mgqonline.org/mods/mod-framework) or the Mod Co
 
 `ENABLED` is a constant at the top of `Invasions.rb`. Open it in any text editor to change it. `ENABLED = false` turns invasions off without uninstalling the mod.
 
+## Requirements
+
+The [Mod Framework](https://mgqonline.org/mods/mod-framework) is optional. With it, the options are in the game's options under **Mods**; without it, in the Mod Config Menu or at the end of the game's Config menu. It comes on its own, not with the Collection or MGQ Online: install it as its page says.
+
 ## Install
 
 1. Install the community's mod loader: the `Patch.rb` from [*Patch.rb (enable Type 1 mods)*](https://mgq.miraheze.org/wiki/Paradox_mods#Patch.rb_(enable_Type_1_mods)) on the MGQ wiki, in your `Patch` folder. If you already use other Patch folder mods, you have it.
