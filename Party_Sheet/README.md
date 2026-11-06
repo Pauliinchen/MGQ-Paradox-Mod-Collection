@@ -67,10 +67,14 @@ With the [Mod Framework](https://mgqonline.org/mods/mod-framework) or the Mod Co
 - **[Party Sheet] Output**: write the page and the image, only the page, or only the image.
 - **Write Party Sheet**: writes it right away, like the hotkey.
 - **[Party Sheet] Upload**: **Off** (default), **Public** or **Link Only**, see [Sharing on mgqonline.org](#sharing-on-mgqonlineorg).
-- **[Party Sheet] Hotkey**: the hotkey that writes the sheet anywhere in the game, **P** by default. With the Mod Framework, confirm it and press the new key; it refuses the game's own keys and keys another mod's hotkey already has. In other menus, and while the Mod Framework runs without its DLL, pick among the letters the game leaves free (P, O, I, U, K, L, M, N, J, H, G), Tab, Insert, Home, End, or **None** to write it only with the button. While another mod takes typed text, such as a chat, the hotkey does nothing.
+- **[Party Sheet] Hotkey**: the hotkey that writes the sheet anywhere in the game, **P** by default. With the Mod Framework, it sits among the hotkeys of every mod: confirm it and press the new key; it refuses the game's own keys and keys another mod's hotkey already has, and the key counts for every save. Until you bind a key there, the Hotkey you picked in a save before moves there from the first save you load that has one: its key, or **None**, which turns the hotkey off until you bind a key. In other menus, and while the Mod Framework runs without its DLL, pick among the letters the game leaves free (P, O, I, U, K, L, M, N, J, H, G), Tab, Insert, Home, End, or **None** to write it only with the button. While another mod takes typed text, such as a chat, the hotkey does nothing.
 - **[Party Sheet] Theme**: the colours of the page and the image.
   - **Dynamic** (default): white and gold if you chose Ilias, dark and purple if you chose Alice. Before you choose, it stays dark.
   - **Static**: always the same colours, the ones picked under **`-> Shown Theme`**: **Alice (Dark)** (default) or **Ilias (Light)**.
+
+## Requirements
+
+The [Mod Framework](https://mgqonline.org/mods/mod-framework) is optional. Without it, the mod and its hotkey work the same, and the options are in the Mod Config Menu or the game's Config menu, where the hotkey is picked per save. It comes on its own, not with the Collection or MGQ Online: install it as its page says.
 
 ## Install
 

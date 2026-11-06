@@ -2,6 +2,8 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-07: Dropped the key binding of Mod Config Remake
+#      Paulinchen  2026-10-31: Made Hotkey a hotkey of the Mod Framework while its DLL works, taking over the key or None of a save once
 #      Paulinchen  2026-10-30: Made Hotkey a key binding only where the Mod Framework's DLL works
 #                            - Showed or hid Shown Theme at once in the Mod Framework's options
 #      Paulinchen  2026-10-22: Uploaded the page and the character image with faces instead of pictures
@@ -149,12 +151,18 @@ module MGQ_PartySheet
   # Writes the sheet when the key of the Hotkey option went down, or the image of the member the
   # status screen shows. Called once per frame.
   def self.check_hotkey
+    return if Hotkey.framework?
     return unless Keyboard.pressed?(Options.hotkey)
 
-    actor = Party.status_actor
-    actor ? write_character(actor) : write
+    write_here
   rescue => e
     log("hotkey check failed: #{e.class}: #{e.message}")
+  end
+
+  # Writes the image of the member the status screen shows, else the sheet, as the hotkey does.
+  def self.write_here
+    actor = Party.status_actor
+    actor ? write_character(actor) : write
   end
 
   # Builds a part of the page, leaving it out when the game lacks what it reads.
@@ -281,6 +289,95 @@ module MGQ_PartySheet
       @get_env ||= Win32API.new('kernel32', 'GetEnvironmentVariableW', 'ppl', 'l')
       length = @get_env.call(string(name), buffer, MAX_CHARS)
       length > 0 && length < MAX_CHARS ? text(buffer, length) : nil
+    end
+  end
+
+  # The hotkey as one of the Mod Framework's hotkeys while its DLL works, with its key row among
+  # every mod's hotkeys in Options > Mods, else Keyboard and the Hotkey option do its work.
+  #
+  # Until a key is bound there, the Hotkey of the next save loaded that has one moves over: a key
+  # becomes the bound key, None turns the hotkey off until the player binds one.
+  module Hotkey
+    # The hotkey's action among every mod's hotkeys.
+    ACTION = :party_sheet_write
+
+    # The Mod Framework's setting that keeps the key bound to the hotkey.
+    SETTING = "key_party_sheet_write"
+
+    # The Mod Framework's setting that turns the hotkey off while no key is bound, set when a save
+    # whose Hotkey is None moved over.
+    OFF = "party_sheet_hotkey_off"
+
+    # Its row's name in Options > Mods.
+    NAME = "[Party Sheet] Hotkey"
+
+    # Its row's help in Options > Mods.
+    HELP = "The key that writes the party sheet anywhere in the game."
+
+    # What its row's help adds while the hotkey is off.
+    OFF_HELP = " Off, as a save had None. Bind a key to turn it on."
+
+    # Makes the hotkey one of the Mod Framework's, when the framework runs with its DLL.
+    #
+    # @return [Boolean] whether the framework took it
+    def self.define
+      return false unless defined?(Mod_Framework::Hotkeys) && Mod_Framework.available?
+
+      help = off? ? HELP + OFF_HELP : HELP
+      @framework = Mod_Framework::Hotkeys.define(ACTION, :key => Options::HOTKEYS.keys.first, :name => NAME, :help => help,
+                                                 :setting => SETTING, :log => MGQ_PartySheet) { MGQ_PartySheet::Hotkey.press }
+      MGQ_PartySheet.log("the Mod Framework refused the hotkey, it stays an option of the save") unless @framework
+      @framework
+    rescue => e
+      MGQ_PartySheet.log("hotkey through the Mod Framework FAILED: #{e.class}: #{e.message}")
+      @framework = false
+    end
+
+    # @return [Boolean] whether the hotkey is one of the Mod Framework's
+    def self.framework?
+      @framework == true
+    end
+
+    # Writes the sheet as the hotkey does, unless a save's None turned the hotkey off.
+    def self.press
+      return MGQ_PartySheet.log("the hotkey is off, as a save had None; a key bound in Options > Mods turns it on") if off?
+
+      MGQ_PartySheet.write_here
+    end
+
+    # @return [Boolean] whether the player bound a key to the hotkey in the Mod Framework, or one
+    #   moved over from a save
+    def self.bound?
+      Mod_Framework::Settings.setting(SETTING) ? true : false
+    end
+
+    # @return [Boolean] whether a save's None turned the hotkey off and no key was bound since
+    def self.off?
+      Mod_Framework::Settings.setting(OFF) && !bound? ? true : false
+    end
+
+    # @return [Boolean] whether the Hotkey of the next save loaded that has one still moves over
+    def self.moving?
+      framework? && Mod_Framework::Settings.readable? && !bound? && !Mod_Framework::Settings.setting(OFF)
+    end
+
+    # Moves the Hotkey of the save just loaded into the Mod Framework while no key is bound there:
+    # the key bound from then on counts for every save. A save whose Hotkey was never changed has
+    # nothing to move.
+    def self.move_saved_key
+      return unless moving?
+
+      code = $game_system.conf[Options::HOTKEY]
+      return if code.nil?
+
+      if code.to_i > 0
+        Mod_Framework::Hotkeys.bind(ACTION, code.to_i)
+        MGQ_PartySheet.log("took over the hotkey #{Mod_Framework::Hotkeys.label(ACTION)} of this save into the Mod Framework")
+      elsif Mod_Framework::Settings.store(OFF, 1)
+        MGQ_PartySheet.log("this save had no hotkey, so the hotkey is off until a key is bound in Options > Mods")
+      end
+    rescue => e
+      MGQ_PartySheet.log("taking over the hotkey of this save FAILED: #{e.class}: #{e.message}")
     end
   end
 
@@ -453,28 +550,25 @@ module MGQ_PartySheet
       entry
     end
 
-    # Adds Hotkey before the menu's last entry: a key binding, which takes the next key pressed,
-    # where the menu binds keys, else a choice among HOTKEYS.
+    # Makes Hotkey one of the Mod Framework's hotkeys, whose row the framework adds, else adds it
+    # before the menu's last entry: a key binding, which takes the next key pressed, where the menu
+    # binds keys, else a choice among HOTKEYS.
     #
     # Older menus show a key binding as a button that does nothing, and the game's options, which
     # get the rows while the Mod Framework runs without its DLL, leave it out.
     def self.add_hotkey
-      name = "[Party Sheet] Hotkey"
-      help = "The key that writes the party sheet anywhere in the game."
-      return add(HOTKEY, name, help, hotkey_values) unless key_bindings?
+      return if Hotkey.define
+      return add(HOTKEY, Hotkey::NAME, Hotkey::HELP, hotkey_values) unless key_bindings?
 
-      @menu.insert(-2, :key => HOTKEY, :name => name, :help => help, :keybind => true)
+      @menu.insert(-2, :key => HOTKEY, :name => Hotkey::NAME, :help => Hotkey::HELP, :keybind => true)
       NWConst::Config::DEFAULT[HOTKEY] = HOTKEYS.keys.first
     end
 
-    # Tells whether the menu binds keys: the Mod Framework's while its DLL works, else Mod Config
-    # Remake 1.3.0 or later.
+    # Tells whether the menu binds keys: the Mod Framework's while its DLL works.
     #
     # @return [Boolean] whether it does
     def self.key_bindings?
-      return Mod_Framework.available? if defined?(Mod_Framework)
-
-      defined?(ModConfigRemake::Keys) ? true : false
+      defined?(Mod_Framework) && Mod_Framework.available? ? true : false
     end
 
     # @return [Hash{Integer => Array(String, String)}] HOTKEYS by their name and help in the menu
@@ -3010,6 +3104,7 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
       def load_game_without_rescue(index, *args)
         result = mgq_party_sheet_load_game_without_rescue(index, *args)
         MGQ_PartySheet::Slot.index = index
+        MGQ_PartySheet::Hotkey.move_saved_key
         result
       end
 
