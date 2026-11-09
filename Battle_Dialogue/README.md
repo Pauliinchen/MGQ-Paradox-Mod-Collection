@@ -1,21 +1,27 @@
 # Battle Dialogue
 
-Shows what is said in a battle in boxes that slide out at the sides of the screen, in the same style as [Map Display](../Map_Display), instead of the message window. The battle no longer stops until you press a key: animations and damage go on while the lines are shown.
+Shows what is said in a battle in boxes that slide out at the sides of the screen, instead of the message window. The battle no longer stops until you press a key: animations and damage go on while the lines are shown.
 
 - Lines of your party slide out at the left with a green bar, lines of the enemy side at the right with a red bar, each with the speaker's face and name. The box fades out towards the middle of the screen.
 - A summon speaks on the side of whoever summoned it.
 - Lines of the game's events, such as an enemy's answers when you use Talk, show at the right unless a member of your party says them.
 - Messages nobody says, such as "... appears!", show as a see-through strip at the top, below the skill name.
-- Each box stays for 1.5 to 5 seconds, depending on how long the line is, then fades out. Up to three stack on each side, the newest on top.
+- Each box stays for 1.5 to 5 seconds, depending on how long the line is, then fades out. Up to three stack on each side, the newest on top; the others move down for a new one and up when one is gone.
+- When the battle ends, every box goes at once.
 - Messages with choices stay in the normal message window.
 - Once a battle is won or lost, its messages stay in the normal message window too, so victory screens such as Victory_Screen.rb wait for you as before.
 
 It works together with [Monster Girl Quest! Online](https://github.com/Pauliinchen/MGQ-Online).
 
+## Requirements
+
+**Battle Dialogue requires the [Mod Framework](https://mgqonline.org/mods/mod-framework).** Without it, Battle Dialogue does nothing and battles show their lines in the message window. It comes on its own, not with the Collection or MGQ Online: install it as its page says.
+
 ## Install
 
 1. Install the community's mod loader: the `Patch.rb` from [*Patch.rb (enable Type 1 mods)*](https://mgq.miraheze.org/wiki/Paradox_mods#Patch.rb_(enable_Type_1_mods)) on the MGQ wiki, in your `Patch` folder. If you already use other Patch folder mods, you have it.
-2. [Download `Battle_Dialogue.rb`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Battle_Dialogue.rb) and put it into the `Patch` folder.
+2. Install the [Mod Framework](https://mgqonline.org/mods/mod-framework) as its page says.
+3. [Download `Battle_Dialogue.rb`](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/releases/latest/download/Battle_Dialogue.rb) and put it into the `Patch` folder.
 
 To uninstall, delete `Patch\Battle_Dialogue.rb`.
 
@@ -27,7 +33,7 @@ Timing, sizes, positions and colors are constants at the top of `Battle_Dialogue
 
 Tested on 3.06, with and without the English translation.
 
-This mod wraps the following methods and calls the original from them:
+Battle Dialogue draws its boxes through the Mod Framework, above the battle's windows. It wraps the following methods and calls the original from them:
 
 - `Scene_Battle#wait_for_message`
 - `Scene_Battle#process_skill_word`
