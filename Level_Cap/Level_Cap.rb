@@ -2,6 +2,20 @@
 #  Level_Cap.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-09: Showed the Job Points tab as character cards that open a dialog with the tiers and Reset
+#                            - Named the overview tab Level Cap
+#                            - Showed the formation outside the Pocket Castle and every companion with a search inside
+#                            - Showed the job in green and the race in blue on lines of their own
+#                            - Gave each card's bar to its character, so it never slides from another character's value
+#                            - Fitted the mastered count back on the cards with less padding and a smaller page head
+#                            - Said that slot prices scale by tier instead of naming the tiers
+#                            - Paged only in the Pocket Castle, the formation first, and scrolled the cards in the room
+#                            - Started the dialog's notes after the widest tier name
+#                            - Opened the character dialog from Allocate on the job change screen with the Mod Framework
+#                            - Tightened the card lines, sized the face to the card head and put the pagination and the sprite back
+#                            - Scaled the head sprite in a grid and gave the card name and points their normal rows
+#      Paulinchen  2026-11-08: Patched the World overview by its mgq_online_ ids
+#      Paulinchen  2026-11-06: Moved the points page into MGQ Online's World overview as a Job Points tab through the Mod Framework's UI.patch
 #      Paulinchen  2026-10-24: Replaced the job and race limits with points spent on slots per tier
 #                            - Added slot allocation and class reset to the job change screen
 #                            - Mastered classes in remembered tiers on taking them up
@@ -1156,7 +1170,11 @@ module MGQ_LevelCap
   # The width in pixels of the allocation windows.
   WINDOW_WIDTH = 520
 
-  # Shows a character's free and total points above the slot list, and how to change slots.
+  # Where the character's dialog shows from Allocate, for the log.
+  JOB_CHANGE_PLACE = "the job change screen"
+
+  # Shows a character's free and total points above the slot list, and how to change slots; only
+  # without the Mod Framework, whose character dialog shows them otherwise.
   class Window_Points < Window_Base
     def initialize
       super((Graphics.width - WINDOW_WIDTH) / 2, 0, WINDOW_WIDTH, fitting_height(2))
@@ -1190,7 +1208,8 @@ module MGQ_LevelCap
   end
 
   # Lists the ten tiers, jobs then races, each with its taken and bought slots, its price and how
-  # many jobs or races of it the character ever had mastered. ←/→ refund or buy a slot.
+  # many jobs or races of it the character ever had mastered. ←/→ refund or buy a slot. Only
+  # without the Mod Framework, as Window_Points.
   class Window_Slots < Window_Selectable
     # The rows: kind and tier.
     ROWS = [:job, :race].product([1, 2, 3, 4, 5])
@@ -1312,209 +1331,624 @@ module MGQ_LevelCap
   end
 end
 
-# The pages mods offer to other mods' screens, kept apart from every mod: whichever mod loads first
-# defines it, so no mod names another.
-module ModPages
-  @pages = []
+# The job and race points as a tab of MGQ Online's World overview, through the Mod Framework's
+# UI.patch; without the framework there is no tab, and without MGQ Online the patch finds nothing.
+if defined?(Mod_Framework::UI::Component) && Mod_Framework::UI.respond_to?(:patch)
+  module MGQ_LevelCap
+    # The Level Cap tab: a card per character with their points, and a dialog per character with
+    # a row per tier that Left and Right buy and refund slots with, and Reset.
+    module Points
+      # The overview's window, which MGQ Online names.
+      OVERVIEW = "#mgq_online_overview"
 
-  # Adds a page once.
-  #
-  # @param page [Object] The page.
-  def self.add(page)
-    @pages << page unless @pages.include?(page)
-  end
+      # The row of tabs of the overview, which the tab goes to the end of.
+      OVERVIEW_TABS = "#mgq_online_overview_tabs"
 
-  # Lists the pages added, in their order.
-  #
-  # @return [Array<Object>] The pages.
-  def self.all
-    @pages.dup
-  end
-end unless defined?(ModPages)
+      # The overview's key help, which MGQ Online names from the release that tells the tab shown.
+      OVERVIEW_KEYS = "#mgq_online_overview_keys"
 
-module MGQ_LevelCap
-  # The job and race points as a page another mod's screen may show, such as a tab of a world
-  # overview: the characters in groups, each with a control per tier in the pane that Left and Right
-  # buy and refund slots with, and a Reset button beside their name. Its answers follow ModPages'
-  # usual page: title, shown?, head, groups, row, pane, adjust, menu and choose.
-  class Page
-    # Granberia's actor, whose portrait heads the page.
-    GRANBERIA = 16
+      # The tab's title.
+      TAB_TITLE = "Level Cap"
 
-    # @return [String] The tab's title.
-    def title
-      "Level Cap"
-    end
+      # The tab's id.
+      TAB_ID = :level_cap_job_points
 
-    # @return [Boolean] Whether the points apply now.
-    def shown?
-      $game_party && MGQ_LevelCap.active? ? true : false
-    end
+      # The id of the page of cards.
+      PAGE_ID = :level_cap_page
 
-    # @return [Array] The head's title, note, lines and portrait: the prices, the open tiers and
-    #   Granberia.
-    def head
-      opened = "Open: jobs up to #{TIERS[MGQ_LevelCap.open_tier(:job) - 1]}, races up to #{TIERS[MGQ_LevelCap.open_tier(:race) - 1]}."
-      ["Job and race points", "#{MGQ_LevelCap.points} points",
-       ["Slots cost #{PRICES[:job].join('/')} points (Basic to Forbidden), races double.", opened], looks($game_actors[GRANBERIA])]
-    end
+      # The id of the dialog of a character.
+      DIALOG_ID = :level_cap_dialog
 
-    # @return [Array<Array>] The party and the Pocket Castle, each with their characters' ids.
-    def groups
-      party = $game_party.all_members.select { |actor| MGQ_LevelCap.record(actor) }.map { |actor| actor.id }
-      members = $game_party.respond_to?(:include_members) ? $game_party.include_members : $game_party.all_members
-      castle = members.select { |actor| MGQ_LevelCap.record(actor) }.map { |actor| actor.id } - party
-      [["Party", party], ["Pocket Castle", castle]].reject { |_, ids| ids.empty? }
-    end
+      # The id of the dialog's list of tiers.
+      TIERS_ID = :level_cap_tiers
 
-    # @param id [Integer] A character's actor id.
-    # @return [Array] Their row: name, worn job and race, free points, not dimmed.
-    def row(id)
-      actor = $game_actors[id]
-      [actor.name, "#{actor.class.name} / #{actor.tribe.name}", "#{MGQ_LevelCap.free_points(actor)} free", false]
-    end
+      # The id of the question before a reset.
+      QUESTION_ID = :level_cap_reset_question
 
-    # @param id [Integer] A character's actor id.
-    # @return [Array] Their pane: name, looks, under Jobs and Races a control per tier with taken
-    #   and bought slots, price and remembered masteries, toned by how full it is, and their free
-    #   points under the name.
-    def pane(id)
-      actor = $game_actors[id]
-      lines = []
-      Window_Slots::ROWS.each_with_index do |(kind, tier), index|
-        if tier == 1
-          lines << [:gap] unless lines.empty?
-          lines << [:text, kind == :job ? "Jobs" : "Races"]
+      # The id of the search in the Pocket Castle.
+      SEARCH_ID = :level_cap_search
+
+      # The id of the pagination of the cards in the Pocket Castle.
+      PAGES_ID = :level_cap_pages
+
+      # Where the dialog shows from the overview's cards, for the log.
+      OVERVIEW_PLACE = "the World overview"
+
+      # The cards each page after the formation's shows in the Pocket Castle: two rows of four.
+      CARDS_PER_PAGE = 8
+
+      # Granberia's actor, whose portrait heads the page.
+      GRANBERIA = 16
+
+      # The colors of a tier by how full it is, see tone.
+      TONE_COLORS = { :dim => :dim, :bad => :error, :warn => :warning, :good => :success }
+
+      # The color of jobs, the theme's green made for text in every look.
+      JOB_COLOR = :success
+
+      # The color of races: a soft blue, since no theme color is a blue in every look.
+      RACE_COLOR = [110, 160, 230]
+
+      # The color of a character's points while their slots cost more than they have.
+      OVER_POINTS_COLOR = :orange
+
+      # What the overview's key help names while the cards show, where the arrows move between the
+      # cards instead of turning the overview's pages.
+      CARD_KEYS = [{ :key => "Arrows", :text => "pick" }, { :key => "Tab", :text => "page" }, { :button => :C, :text => "open" }, { :button => :B, :text => "close" }]
+
+      # What the key help names after the arrows while the Pocket Castle has pages of cards to turn.
+      PAGE_KEYS = { :key => "Q or W", :text => "more characters" }
+
+      # What the dialog's key help names.
+      DIALOG_KEYS = [{ :key => "Left or right", :text => "remove or add a slot" }, { :button => :B, :text => "close" }]
+
+      # The data of the Reset row of the dialog's list.
+      RESET_ROW = :reset
+
+      # Appends the tab to the overview each time the overview renders, and names the cards' keys in
+      # its key help while the tab shows.
+      def self.patch_overview
+        Mod_Framework::UI.patch OVERVIEW do |overview|
+          overview.append OVERVIEW_TABS do
+            tab TAB_TITLE, id: TAB_ID, visible: Points.shown? do
+              component Page
+            end
+          end
+          overview.set OVERVIEW_KEYS, entries: Points.card_keys if Points.tab_shown?(overview)
         end
-        lines << [:control, index, TIERS[tier - 1], slot_note(actor, kind, tier), tone(actor, kind, tier),
-                  MGQ_LevelCap.can_remove?(actor, kind, tier) ? true : false, MGQ_LevelCap.can_add?(actor, kind, tier) ? true : false]
       end
-      [actor.name, looks(actor), lines, "#{MGQ_LevelCap.free_points(actor)} of #{MGQ_LevelCap.points} points free"]
-    end
 
-    # Buys or refunds a slot of a tier.
-    #
-    # @param id [Integer] A character's actor id.
-    # @param index [Integer] The tier's place in Window_Slots::ROWS.
-    # @param step [Integer] 1 to buy, -1 to refund.
-    # @return [String, nil] Why the slot did not change; nil once it did.
-    def adjust(id, index, step)
-      actor = $game_actors[id]
-      kind, tier = Window_Slots::ROWS[index]
-      return nil if MGQ_LevelCap.change_slot(actor, kind, tier, step)
+      # @return [Array<Hash>] What the key help names while the cards show; Q and W only while the
+      #   Pocket Castle has more companions than the formation's page.
+      def self.card_keys
+        castle = in_castle?
+        return CARD_KEYS unless castle && pages(characters, castle).size > 1
 
-      refusal(actor, kind, tier, step)
-    end
-
-    # Lists the Reset button, then after it the Basic job to keep, the Basic race to keep and the
-    # confirmation.
-    #
-    # @param id [Integer] A character's actor id.
-    # @param path [Array<Integer>] The button and the choices taken so far.
-    # @return [Array<Array>] Each choice's text and whether it can be taken; none once path is whole.
-    def menu(id, path)
-      actor = $game_actors[id]
-      return [] unless actor && MGQ_LevelCap.record(actor)
-
-      case path.size
-      when 0 then [["Reset", !MGQ_LevelCap.basic_choices(actor, :job).empty? && !MGQ_LevelCap.basic_choices(actor, :race).empty?]]
-      when 1 then choices(actor, :job)
-      when 2 then choices(actor, :race)
-      when 3 then [["Reset", true], ["Cancel", true]]
-      else []
+        CARD_KEYS[0, 1] + [PAGE_KEYS] + CARD_KEYS[1..-1]
       end
-    end
 
-    # Resets with the Basic job and race picked, once confirmed.
-    #
-    # @param id [Integer] A character's actor id.
-    # @param path [Array<Integer>] The button and the choices taken.
-    # @return [String, nil] What happened; nil for a reset called off.
-    def choose(id, path)
-      return nil unless path[3] == 0
-
-      actor = $game_actors[id]
-      job = MGQ_LevelCap.basic_choices(actor, :job)[path[1]]
-      race = MGQ_LevelCap.basic_choices(actor, :race)[path[2]]
-      MGQ_LevelCap.reset(actor, job, race) ? "Reset #{actor.name}'s jobs and races." : "#{actor.name} cannot be reset."
-    end
-
-    private
-
-    # @param actor [Game_Actor, nil] A character.
-    # @return [Array, nil] How they look: map sprite and face; nil without a character.
-    def looks(actor)
-      actor && [actor.character_name, actor.character_index, actor.face_name, actor.face_index]
-    end
-
-    # @param actor [Game_Actor] The character.
-    # @param kind [Symbol] :job or :race
-    # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
-    # @return [String] Such as "1/2, 4 pts, 2 mastered".
-    def slot_note(actor, kind, tier)
-      record = MGQ_LevelCap.record(actor)
-      mastered = record[:mastered][kind][tier - 1]
-      note = "#{MGQ_LevelCap.counts(actor, kind)[tier - 1]}/#{record[:slots][kind][tier - 1]}, #{price_text(kind, tier)}"
-      mastered > 0 ? "#{note}, #{mastered} mastered" : note
-    end
-
-    # @param actor [Game_Actor] The character.
-    # @param kind [Symbol] :job or :race
-    # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
-    # @return [Symbol, nil] :dim before the story opens the tier, :bad with more classes than slots,
-    #   :warn while full, :good with room left; nil without slots.
-    def tone(actor, kind, tier)
-      return :dim if tier > MGQ_LevelCap.open_tier(kind)
-
-      count = MGQ_LevelCap.counts(actor, kind)[tier - 1]
-      slots = MGQ_LevelCap.record(actor)[:slots][kind][tier - 1]
-      if count > slots then :bad
-      elsif count < slots then :good
-      elsif slots > 0 then :warn
+      # @return [Boolean] Whether the points apply now.
+      def self.shown?
+        $game_party && MGQ_LevelCap.active? ? true : false
       end
-    end
 
-    # @param actor [Game_Actor] The character.
-    # @param kind [Symbol] :job or :race
-    # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
-    # @param step [Integer] 1 to buy, -1 to refund.
-    # @return [String] Why the slot cannot change.
-    def refusal(actor, kind, tier, step)
-      record = MGQ_LevelCap.record(actor)
-      return "#{actor.name}'s slots cannot change now." unless record && MGQ_LevelCap.active?
-
-      name = slot_name(kind, tier)
-      if step > 0
-        return "#{name} open later in the story." if tier > MGQ_LevelCap.open_tier(kind)
-
-        "A slot of #{name} costs #{price_text(kind, tier)}; #{actor.name} has #{MGQ_LevelCap.free_points(actor)} free."
-      elsif record[:slots][kind][tier - 1] <= FREE_SLOTS[kind][tier - 1]
-        "#{actor.name} has no bought slot of #{name} to remove."
-      else
-        "Every slot of #{name} is taken; a reset frees them."
+      # @param overview [Object] The patch's handle of the overview.
+      # @return [Boolean] Whether the overview shows the tab; false for an MGQ Online that does not
+      #   tell the tab shown, whose key help has no id either.
+      def self.tab_shown?(overview)
+        overview.read(:tab) == TAB_ID
+      rescue
+        false
       end
-    end
 
-    # @param actor [Game_Actor] The character.
-    # @param kind [Symbol] :job or :race
-    # @return [Array<Array>] The Basic jobs or races a reset may keep.
-    def choices(actor, kind)
-      MGQ_LevelCap.basic_choices(actor, kind).map { |id| [$data_classes[id].name, true] }
-    end
+      # @return [Boolean] Whether the player stands in the Pocket Castle, by the game's own check.
+      def self.in_castle?
+        $game_map && $game_map.respond_to?(:pocket_castle?) && $game_map.pocket_castle? ? true : false
+      rescue
+        false
+      end
 
-    # @param kind [Symbol] :job or :race
-    # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
-    # @return [String] A slot's price, such as "1 pt" or "6 pts".
-    def price_text(kind, tier)
-      price = PRICES[kind][tier - 1]
-      price == 1 ? "1 pt" : "#{price} pts"
-    end
+      # Lists the characters with a record that the page shows: in the Pocket Castle the party and
+      # then every companion kept there, elsewhere the formation in the game's order.
+      #
+      # @return [Array<Game_Actor>] The characters.
+      def self.characters
+        party = $game_party.all_members.select { |actor| MGQ_LevelCap.record(actor) }
+        return party unless in_castle? && $game_party.respond_to?(:include_members)
 
-    # @param kind [Symbol] :job or :race
-    # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
-    # @return [String] Such as "Sealed jobs".
-    def slot_name(kind, tier)
-      "#{TIERS[tier - 1]} #{kind == :job ? 'jobs' : 'races'}"
+        party + ($game_party.include_members.select { |actor| MGQ_LevelCap.record(actor) } - party)
+      end
+
+      # @param actors [Array<Game_Actor>] The characters.
+      # @param search [String] What the player typed.
+      # @return [Array<Game_Actor>] Those whose name, job or race holds the search, ignoring case.
+      def self.found(actors, search)
+        word = search.to_s.strip.downcase
+        return actors if word.empty?
+
+        actors.select { |actor| [actor.name, job_name(actor), race_name(actor)].any? { |name| name.to_s.downcase.include?(word) } }
+      end
+
+      # Splits the characters shown into pages: outside the Pocket Castle one page; inside it the
+      # formation's members first, then the other companions CARDS_PER_PAGE to a page.
+      #
+      # @param actors [Array<Game_Actor>] The characters shown, the formation's first.
+      # @param castle [Boolean] Whether the player stands in the Pocket Castle.
+      # @return [Array<Array<Game_Actor>>] Their pages of cards, at least one.
+      def self.pages(actors, castle)
+        return [actors] unless castle
+
+        formation = actors & $game_party.all_members
+        pages = (actors - formation).each_slice(CARDS_PER_PAGE).to_a
+        pages.unshift(formation) unless formation.empty?
+        pages.empty? ? [[]] : pages
+      end
+
+      # Tells what the page shows that the framework cannot see change: where the player stands,
+      # the points, the open tiers and each character's slots and classes.
+      #
+      # @return [Array] The signature.
+      def self.signature
+        [in_castle?, MGQ_LevelCap.points, MGQ_LevelCap.open_tier(:job), MGQ_LevelCap.open_tier(:race),
+         characters.map { |actor| [actor.id, actor.class_id, actor.tribe_id, MGQ_LevelCap.record(actor)[:slots].hash] }]
+      end
+
+      # @return [String] The prices, for the head.
+      def self.prices
+        "Slots cost #{PRICES[:job].join('/')} points, scaling by tier; races cost double."
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @return [Symbol] :face, or :sprite for a character without a face.
+      def self.picture(actor)
+        actor.face_name.to_s.empty? ? :sprite : :face
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @return [String] The points their slots cost of those they have, such as "262/274 pts".
+      def self.used_text(actor)
+        "#{MGQ_LevelCap.spent(actor)}/#{MGQ_LevelCap.points} pts"
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @return [Boolean] Whether their slots cost more points than they have.
+      def self.over?(actor)
+        MGQ_LevelCap.free_points(actor) < 0
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @return [String] The job they wear, such as "Paladin".
+      def self.job_name(actor)
+        data = $data_classes[actor.class_id]
+        data ? data.name : ""
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @return [String] The race they wear, such as "Human".
+      def self.race_name(actor)
+        data = $data_classes[actor.tribe_id]
+        data ? data.name : ""
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @return [String] The jobs and races they ever mastered, such as "21 mastered".
+      def self.mastered_text(actor)
+        mastered = MGQ_LevelCap.record(actor)[:mastered]
+        "#{(mastered[:job] + mastered[:race]).inject(0) { |sum, count| sum + count }} mastered"
+      end
+
+      # Lists a character's tiers: under Jobs and Races, headed in the cards' job and race colors, a
+      # row per tier with its price and remembered masteries, its taken and bought slots, toned by
+      # how full it is.
+      #
+      # @param actor [Game_Actor] The character.
+      # @return [Array<Hash>] The list's rows.
+      def self.tier_rows(actor)
+        rows = []
+        slots = MGQ_LevelCap.record(actor)[:slots]
+        Window_Slots::ROWS.each do |kind, tier|
+          rows << (kind == :job ? { :heading => "Jobs", :color => JOB_COLOR } : { :heading => "Races", :color => RACE_COLOR }) if tier == 1
+          row = { :text => TIERS[tier - 1], :note => tier_note(actor, kind, tier), :value => "#{MGQ_LevelCap.counts(actor, kind)[tier - 1]}/#{slots[kind][tier - 1]}",
+                  :data => [kind, tier], :less => MGQ_LevelCap.can_remove?(actor, kind, tier) ? true : false, :more => MGQ_LevelCap.can_add?(actor, kind, tier) ? true : false }
+          color = TONE_COLORS[tone(actor, kind, tier)]
+          row[:color] = color if color
+          rows << row
+        end
+        rows
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @return [Hash] The Reset row, greyed out with why while there is no Basic job or race to keep.
+      def self.reset_row(actor)
+        row = { :text => "Reset...", :note => "keeps one Basic job and race", :data => RESET_ROW }
+        return row unless reset_items(actor).empty?
+
+        row.merge(:disabled => true, :tooltip => "#{actor.name} has no Basic job or race to keep.")
+      end
+
+      # Buys or refunds a slot of a tier.
+      #
+      # @param actor [Game_Actor] The character.
+      # @param row [Hash] The tier's row, see tier_rows.
+      # @param step [Integer] 1 to buy, -1 to refund.
+      # @param place [String] Where the dialog shows, for the log, such as "the World overview".
+      # @return [String, nil] Why the slot did not change; nil once it did.
+      def self.adjust(actor, row, step, place)
+        kind, tier = row[:data]
+        if MGQ_LevelCap.change_slot(actor, kind, tier, step)
+          MGQ_LevelCap.log("#{actor.name}: #{step > 0 ? 'bought' : 'refunded'} a slot of #{slot_name(kind, tier)} in #{place}")
+          return nil
+        end
+
+        why = refusal(actor, kind, tier, step)
+        MGQ_LevelCap.log("#{actor.name}: no #{step > 0 ? 'more' : 'fewer'} slots of #{slot_name(kind, tier)}: #{why}")
+        why
+      end
+
+      # Lists the choices of a reset: the Basic job to keep, each with the Basic race to keep. A step
+      # with one choice is taken without asking, as the job change screen does.
+      #
+      # @param actor [Game_Actor] The character.
+      # @return [Array<Hash>] The choices, each with the next step's :items or, once both are picked,
+      #   their :data; empty without a Basic job or race to keep.
+      def self.reset_items(actor)
+        jobs = MGQ_LevelCap.basic_choices(actor, :job)
+        races = MGQ_LevelCap.basic_choices(actor, :race)
+        return [] if jobs.empty? || races.empty?
+
+        keep = lambda { |id| "Keep #{$data_classes[id].name}" }
+        race_items = lambda { |job| races.map { |race| { :text => keep.call(race), :data => [job, race] } } }
+        return race_items.call(jobs.first) if jobs.size == 1
+
+        jobs.map { |job| races.size == 1 ? { :text => keep.call(job), :data => [job, races.first] } : { :text => keep.call(job), :items => race_items.call(job) } }
+      end
+
+      # Resets with the Basic job and race picked, once confirmed.
+      #
+      # @param actor [Game_Actor] The character.
+      # @param item [Hash] The choice taken, see reset_items.
+      # @param place [String] Where the dialog shows, for the log.
+      # @return [String, nil] What happened; nil for a reset called off.
+      def self.reset(actor, item, place)
+        return nil unless item.is_a?(Hash) && item[:data]
+
+        job, race = item[:data]
+        done = MGQ_LevelCap.reset(actor, job, race)
+        MGQ_LevelCap.log("#{actor.name}: #{done ? 'reset' : 'not reset'} in #{place}, keeping #{$data_classes[job].name} and #{$data_classes[race].name}")
+        done ? "Reset #{actor.name}'s jobs and races." : "#{actor.name} cannot be reset."
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @param kind [Symbol] :job or :race
+      # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
+      # @return [String] Such as "4 pts, 2 mastered", or "opens later" before the story opens it.
+      def self.tier_note(actor, kind, tier)
+        return "opens later" if tier > MGQ_LevelCap.open_tier(kind)
+
+        mastered = MGQ_LevelCap.record(actor)[:mastered][kind][tier - 1]
+        mastered > 0 ? "#{price_text(kind, tier)}, #{mastered} mastered" : price_text(kind, tier)
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @param kind [Symbol] :job or :race
+      # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
+      # @return [String] The jobs or races that take the tier's slots, such as "Intermediate jobs:
+      #   Paladin, Monk (worn)".
+      def self.tier_classes(actor, kind, tier)
+        worn = kind == :job ? actor.class_id : actor.tribe_id
+        ids = actor.level_list.keys.select do |id|
+          MGQ_LevelCap.kind(id) == kind && MGQ_LevelCap.tier(id) == tier && (actor.level_list[id].to_i >= 2 || id == worn)
+        end
+        return "No #{slot_name(kind, tier)} take a slot." if ids.empty?
+
+        "#{slot_name(kind, tier)}: #{ids.map { |id| id == worn ? "#{$data_classes[id].name} (worn)" : $data_classes[id].name }.join(', ')}"
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @param kind [Symbol] :job or :race
+      # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
+      # @return [Symbol, nil] :dim before the story opens the tier, :bad with more classes than slots,
+      #   :warn while full, :good with room left; nil without slots.
+      def self.tone(actor, kind, tier)
+        return :dim if tier > MGQ_LevelCap.open_tier(kind)
+
+        count = MGQ_LevelCap.counts(actor, kind)[tier - 1]
+        slots = MGQ_LevelCap.record(actor)[:slots][kind][tier - 1]
+        if count > slots then :bad
+        elsif count < slots then :good
+        elsif slots > 0 then :warn
+        end
+      end
+
+      # @param actor [Game_Actor] The character.
+      # @param kind [Symbol] :job or :race
+      # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
+      # @param step [Integer] 1 to buy, -1 to refund.
+      # @return [String] Why the slot cannot change.
+      def self.refusal(actor, kind, tier, step)
+        record = MGQ_LevelCap.record(actor)
+        return "#{actor.name}'s slots cannot change now." unless record && MGQ_LevelCap.active?
+
+        name = slot_name(kind, tier)
+        if step > 0
+          return "#{name} open later in the story." if tier > MGQ_LevelCap.open_tier(kind)
+
+          "A slot of #{name} costs #{price_text(kind, tier)}; #{actor.name} has #{MGQ_LevelCap.free_points(actor)} free."
+        elsif record[:slots][kind][tier - 1] <= FREE_SLOTS[kind][tier - 1]
+          "#{actor.name} has no bought slot of #{name} to remove."
+        else
+          "Every slot of #{name} is taken; a reset frees them."
+        end
+      end
+
+      # @param kind [Symbol] :job or :race
+      # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
+      # @return [String] A slot's price, such as "1 pt" or "6 pts".
+      def self.price_text(kind, tier)
+        price = PRICES[kind][tier - 1]
+        price == 1 ? "1 pt" : "#{price} pts"
+      end
+
+      # @param kind [Symbol] :job or :race
+      # @param tier [Integer] 1 (Basic) to 5 (Forbidden)
+      # @return [String] Such as "Sealed jobs".
+      def self.slot_name(kind, tier)
+        "#{TIERS[tier - 1]} #{kind == :job ? 'jobs' : 'races'}"
+      end
+
+      # Logs the dialog of a character opening or closing.
+      #
+      # @param actor [Game_Actor] The character.
+      # @param what [String] What happened, such as "opened".
+      # @param place [String] Where the dialog shows.
+      def self.log_dialog(actor, what, place)
+        MGQ_LevelCap.log("#{actor.name} (actor #{actor.id}): dialog #{what} in #{place}")
+      end
+
+      # The page of the tab: Granberia heading the prices, in the Pocket Castle a search, a page of
+      # character cards that scrolls in the room left, and the pages at its foot.
+      class Page < Mod_Framework::UI::Component
+        # The width of the grid item of Granberia's map sprite in the head, which the sprite scales to.
+        SPRITE_WIDTH = 20
+
+        # The height of a line of the prices and of a card's job, race and mastered count.
+        SMALL_LINE = 16
+
+        # The height of a card's name and points, a text's normal row.
+        ROW_LINE = 24
+
+        # The height of a card's bar.
+        BAR_HEIGHT = 4
+
+        # The side of a card's face: as high as the name, the points and the bar beside it.
+        FACE_SIDE = 2 * ROW_LINE + BAR_HEIGHT
+
+        # The page of cards shown, 1 for the first.
+        state :page_no, 1
+
+        # The place on its page of the card that held the focus last.
+        state :spot, 0
+
+        # What the player typed into the search in the Pocket Castle.
+        state :search, ""
+
+        watch(:every => 10) { Points.signature }
+
+        # Describes the page.
+        def render
+          castle = Points.in_castle?
+          shown = castle ? Points.found(Points.characters, search) : Points.characters
+          pages = Points.pages(shown, castle)
+          actors = pages[[[page_no, 1].max, pages.size].min - 1]
+          stack id: PAGE_ID, height: :fill, spacing: 0.5, on_page: ->(step) { turn(step, pages) } do
+            head
+            search_field if castle
+            text "No companion matches \"#{search.strip}\".", color: :dim, visible: shown.empty?
+            paper scroll: :vertical, border: false, padding: 0, height: :fill do
+              grid spacing: 0.5, leave_ends: true do
+                actors.each_with_index do |actor, place|
+                  grid_item xs: 3, key: place do
+                    card_of(actor, place)
+                  end
+                end
+              end
+            end
+            pagination count: pages.size, bind: :page_no, id: PAGES_ID, visible: pages.size > 1, align_self: :end
+          end
+        end
+
+        # Describes the head: Granberia's map sprite, the title, the points every character has and
+        # the prices.
+        def head
+          grid spacing: 1 do
+            granberia = $data_actors[GRANBERIA]
+            grid_item(xs: 1, width: SPRITE_WIDTH, align_self: :center) { image figure: granberia, scale: :auto } if granberia
+            grid_item xs: 11 do
+              stack spacing: 0 do
+                stack row: true do
+                  text "Job and race points", typo: :subtitle1, grow: 1
+                  text "#{MGQ_LevelCap.points} points", color: :dim, align_self: :center
+                end
+                text Points.prices, typo: :caption, line_height: SMALL_LINE, wrap: true
+              end
+            end
+          end
+        end
+
+        # Describes the search over the cards; its caption titles the game's letter pages on a
+        # gamepad.
+        def search_field
+          field "Search" do
+            text_field bind: :search, id: SEARCH_ID, placeholder: "Name, job or race", width: :fill,
+                       on_change: ->(_text) { self.page_no = 1 }, on_submit: ->(_text) { log_search }, on_cancel: -> { log_search }
+          end
+        end
+
+        # Describes a character's card: the face, the name and the points used over a bar of them,
+        # then the job and the race worn and the jobs and races mastered.
+        #
+        # @param actor [Game_Actor] The character.
+        # @param place [Integer] The card's place on its page, from 0.
+        def card_of(actor, place)
+          points = MGQ_LevelCap.points
+          over = Points.over?(actor) ? { :color => OVER_POINTS_COLOR } : {}
+          card clickable: true, padding: 1, id: :"level_cap_card_#{place}", on_click: -> { open_dialog(actor) }, on_focus: -> { focused(place) } do
+            stack spacing: 0 do
+              stack row: true, spacing: 1 do
+                avatar character: actor, image: Points.picture(actor), shape: :box, width: FACE_SIDE, height: FACE_SIDE, align_self: :start
+                stack grow: 1, spacing: 0, align_self: :start do
+                  text actor.name, typo: :body2, most_lines: 1, width: :fill
+                  text(Points.used_text(actor), { :typo => :caption, :most_lines => 1, :width => :fill }.merge(over))
+                  # A bar made for another character at this place would slide to this one's value.
+                  progress({ :key => actor.id, :value => [MGQ_LevelCap.spent(actor), points].min, :max => [points, 1].max, :size => :small,
+                             :height => BAR_HEIGHT }.merge(over))
+                end
+              end
+              text Points.job_name(actor), typo: :caption, color: JOB_COLOR, line_height: SMALL_LINE, most_lines: 1, width: :fill
+              text Points.race_name(actor), typo: :caption, color: RACE_COLOR, line_height: SMALL_LINE, most_lines: 1, width: :fill
+              text Points.mastered_text(actor), typo: :caption, color: :dim, line_height: SMALL_LINE, most_lines: 1, width: :fill
+            end
+          end
+        end
+
+        # Notes the card that took the focus, and logs the search the player left for the cards.
+        #
+        # @param place [Integer] The card's place on its page, from 0.
+        def focused(place)
+          self.spot = place
+          log_search
+        end
+
+        # Logs the search once the player stops typing it, with how many companions it finds.
+        def log_search
+          word = search.strip
+          return if word == (@logged_search || "") || !Points.in_castle?
+
+          @logged_search = word
+          all = Points.characters
+          what = word.empty? ? "emptied" : "\"#{word}\": #{Points.found(all, word).size} of #{all.size} companions match"
+          MGQ_LevelCap.log("search in the Pocket Castle on the World overview's Level Cap tab #{what}")
+        end
+
+        # Logs the search the player typed last as the page leaves the screen.
+        def unmounted
+          log_search
+        rescue => e
+          MGQ_LevelCap.log("search log FAILED: #{e.class}: #{e.message}")
+        end
+
+        # Turns the pages of cards, round at the ends. The focus keeps its place on the cards, or
+        # goes to the last card of a page with fewer.
+        #
+        # @param step [Integer] -1 for the page before, 1 for the next.
+        # @param pages [Array<Array<Game_Actor>>] The pages, see Points.pages.
+        def turn(step, pages)
+          return if pages.size < 2
+
+          shown = ([[page_no, 1].max, pages.size].min - 1 + step) % pages.size + 1
+          Sound.play_cursor
+          self.page_no = shown
+          last = pages[shown - 1].size - 1
+          part(:"level_cap_card_#{last}").focus if spot > last
+        end
+
+        # Opens a character's dialog over the overview.
+        #
+        # @param actor [Game_Actor] The character.
+        def open_dialog(actor)
+          Points.log_dialog(actor, "opened", OVERVIEW_PLACE) if Mod_Framework::UI.open(CharacterDialog, :actor => actor, :place => OVERVIEW_PLACE)
+        end
+      end
+
+      # A character's dialog: their free points, a row per tier that Left and Right buy and refund
+      # slots with, Reset, and the classes of the tier under the cursor or what the last step said.
+      # It opens from the overview's cards and from Allocate on the job change screen.
+      class CharacterDialog < Mod_Framework::UI::Component
+        # The dialog's width.
+        WIDTH = 380
+
+        # The character.
+        param :actor
+
+        # Where it shows, for the log: OVERVIEW_PLACE or MGQ_LevelCap::JOB_CHANGE_PLACE.
+        param :place
+
+        # The kind and tier under the cursor, nil on Reset.
+        state(:under) { [:job, 1] }
+
+        # What the last step or reset said and its color, nil after one that went through quietly.
+        state :said, nil
+
+        # Describes the dialog.
+        def render
+          rows = Points.tier_rows(actor) + [Points.reset_row(actor)]
+          dialog nil, id: DIALOG_ID, width: WIDTH, on_close: ->(why) { Points.log_dialog(actor, "closed (#{why})", place) } do
+            stack row: true do
+              avatar character: actor, image: Points.picture(actor), shape: :box, size: :medium
+              stack grow: 1, spacing: 0 do
+                text actor.name, typo: :subtitle2
+                text "#{MGQ_LevelCap.free_points(actor)} of #{MGQ_LevelCap.points} points free, #{Points.mastered_text(actor)}", typo: :caption,
+                     color: Points.over?(actor) ? OVER_POINTS_COLOR : :dim
+              end
+            end
+            list rows, id: TIERS_ID, dense: true, most_rows: rows.size, note_at: TIERS, autofocus: true,
+                       on_change: ->(row) { follow(row) }, on_side: ->(row, step) { change_slot(row, step) },
+                       on_submit: ->(row) { start_reset(rows) if row[:data] == RESET_ROW },
+                       on_refuse: ->(row) { MGQ_LevelCap.log("#{actor.name}: no reset: #{row[:tooltip]}") }
+            text(foot, { :wrap => true, :most_lines => 2 }.merge(said ? { :color => said[1] } : { :color => :dim }))
+            key_help entries: DIALOG_KEYS
+          end
+        end
+
+        # @return [String] What the last step said, else the classes of the tier under the cursor.
+        def foot
+          return said[0] if said
+          return "Keeps one Basic job and one Basic race; the points come back." unless under
+
+          Points.tier_classes(actor, under[0], under[1])
+        end
+
+        # Follows the cursor to a row, which ends what the last step said.
+        #
+        # @param row [Hash] The row.
+        def follow(row)
+          self.under = row[:data].is_a?(Array) ? row[:data] : nil
+          self.said = nil
+        end
+
+        # Buys or refunds a slot, with the game's sound, saying why one did not change.
+        #
+        # @param row [Hash] The tier's row.
+        # @param step [Integer] 1 to buy, -1 to refund.
+        def change_slot(row, step)
+          why = Points.adjust(actor, row, step, place)
+          why ? Sound.play_buzzer : Sound.play_cursor
+          self.said = why ? [why, :error] : nil
+        end
+
+        # Asks for the Basic job and race to keep in a menu beside the Reset row, steps with one
+        # choice left out.
+        #
+        # @param rows [Array<Hash>] The list's rows, Reset the last.
+        def start_reset(rows)
+          items = Points.reset_items(actor)
+          return ask(items.first) if items.size == 1 && items.first[:data]
+
+          Mod_Framework::UI.menu(items, :beside => "##{TIERS_ID}", :row => rows.size - 1) { |choice, _index| ask(choice) if choice }
+        end
+
+        # Asks before a reset, Keep lit first since a reset also takes skills away.
+        #
+        # @param choice [Hash] The choice with the Basic job and race to keep.
+        def ask(choice)
+          question = "Reset #{actor.name}'s jobs and races? Points come back, the base level stays."
+          Mod_Framework::UI.confirm(question, :yes => "Reset", :no => "Keep", :id => QUESTION_ID) do |yes|
+            MGQ_LevelCap.log("#{actor.name}: reset called off in #{place}") unless yes
+            told = yes ? Points.reset(actor, choice, place) : nil
+            self.said = [told, :text] if told
+          end
+        end
+      end
     end
   end
 end
@@ -1545,16 +1979,44 @@ class Scene_JobChange
     $game_actors[@actors_window.select_actor_id]
   end
 
-  # Opens the slot list for the picked character.
+  # Opens the picked character's dialog of the Mod Framework, or without it the slot list.
   def mgq_level_cap_open_slots
     actor = mgq_level_cap_actor
     MGQ_LevelCap.remember_mastery(actor)
     @popup_window.hide.deactivate
     @mgq_level_cap_choice.hide.deactivate
+    return if mgq_level_cap_open_dialog(actor)
+
     @mgq_level_cap_points.actor = actor
     @mgq_level_cap_points.show
     @mgq_level_cap_slots.actor = actor
     @mgq_level_cap_slots.show.activate
+  end
+
+  # Opens the character's dialog of the Mod Framework, the overview's, which returns to the
+  # character list as it closes.
+  #
+  # @param actor [Game_Actor] The character.
+  # @return [Boolean] Whether it opened; false without the framework or when it did not open.
+  def mgq_level_cap_open_dialog(actor)
+    return false unless defined?(MGQ_LevelCap::Points::CharacterDialog)
+
+    place = MGQ_LevelCap::JOB_CHANGE_PLACE
+    shown = Mod_Framework::UI.open(MGQ_LevelCap::Points::CharacterDialog, :actor => actor, :place => place) { mgq_level_cap_dialog_closed }
+    MGQ_LevelCap::Points.log_dialog(actor, "opened", place) if shown
+    shown ? true : false
+  rescue => e
+    MGQ_LevelCap.log("character dialog FAILED: #{e.class}: #{e.message}")
+    false
+  end
+
+  # Returns to the character list once the dialog closes. The job list forgets what it answered
+  # for the character, since slots and a reset change which jobs it allows.
+  def mgq_level_cap_dialog_closed
+    @class_name_window.actor_id = -1
+    mgq_level_cap_back_to_actors
+  rescue => e
+    MGQ_LevelCap.log("character dialog close FAILED: #{e.class}: #{e.message}")
   end
 
   # Redraws the points after a slot was bought or refunded.
@@ -1797,9 +2259,9 @@ if MGQ_LevelCap::ENABLED && !SceneManager.respond_to?(:mgq_level_cap_run)
   end
 
   begin
-    ModPages.add(MGQ_LevelCap::Page.new)
+    MGQ_LevelCap::Points.patch_overview if defined?(MGQ_LevelCap::Points)
   rescue => e
-    MGQ_LevelCap.log("page FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.log("overview page FAILED: #{e.class}: #{e.message}")
   end
 
   begin

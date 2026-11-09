@@ -21,10 +21,10 @@ Caps your characters' base level until the next story boss falls, and lets each 
   | Forbidden | 12 | 24 |
 
 - One Basic job slot and one Basic race slot are free. A tier only takes slots once the story has opened it: Intermediate jobs at the Four bandits, Intermediate races at the Micaela event, Advanced at Salamander, Sealed at Garuda, Forbidden races at Kagetsumugi and Forbidden jobs at Uriela on the Chaos route.
-- In the job change screen, pick a character and choose **Allocate**. ←/→ add or remove a slot of the tier under the cursor. A slot that holds a job or race can't be removed; reset instead.
+- In the job change screen, pick a character and choose **Allocate**. ←/→ add or remove a slot of the tier under the cursor. A slot that holds a job or race can't be removed; reset instead. With the Mod Framework installed, Allocate opens the same window as a card of the World overview's **Level Cap** tab, with **Reset** at the end of its list.
 - A job or race takes a slot once it reaches level 2, and the one a character wears always does. A new one can only be taken while its tier has a free slot; the job change screen shows each tier's slots on its tab (**Basic 2/3**: two taken, three slots), greys out the rest and tells which tier is full.
 - **Reset** in the same menu gives back every point. The character keeps one Basic job and one Basic race of your choice; all other jobs and races go, and so does every skill and ability a job or race teaches, Proofs included, unless the kept job or race teaches it. Learn the jobs and races again to get them back. The base level stays. Other Basic races the character had stay available at level 1, since a character can only ever take the Basic races they have had.
-- With [Monster Girl Quest! Online](https://github.com/Pauliinchen/MGQ-Online) installed, its World overview gets a **Level Cap** tab: your characters with their free points. **Enter** on a character moves to their slots per tier, where **Left** removes a slot and **Right** adds one (green: room left, yellow: full, red: more classes than slots), and the **Reset** button beside their name resets them, the same as in the job change screen. **Ctrl** goes back to the characters.
+- With [Monster Girl Quest! Online](https://github.com/Pauliinchen/MGQ-Online) 0.7 or later and the [Mod Framework](https://mgqonline.org/mods/mod-framework) installed, its World overview gets a **Level Cap** tab: a card per character with their face, the points their slots cost of those they have over a bar of them (orange when they cost more), the job they wear (green), the race (blue) and how many jobs and races they have mastered. Outside the Pocket Castle it shows your formation; inside it shows your formation on the first page and every other companion on the pages after it, which **Q** and **W** turn, under a search that finds a companion by name, job or race. Cards that do not fit scroll. The arrows move between the cards and Up from the first row reaches the search. Confirm on a card opens the character's slots per tier and how many jobs and races they have mastered, where **Left** removes a slot and **Right** adds one (green: room left, yellow: full, red: more classes than slots; dim: not open yet), and **Reset** at the end of the list resets them the same as in the job change screen, once you confirm. Cancel closes it.
 - The mod remembers how many jobs and races of each tier a character has ever mastered. Taking up a job or race in such a tier masters it at once, until that count is reached again, so a reset never means grinding the same levels twice. **Allocate** shows the count per tier.
 - Jobs and races from the story, like those Luka gets at the Micaela event, take slots too. If a tier then holds more than its slots, it shows in orange and takes nothing new until you add slots or reset.
 - The final battle of the Chaos route lifts the level cap and gives 50 more points; the slots still apply.
@@ -140,6 +140,10 @@ The cap and the points after beating each boss, and which tiers it opens. Boss L
 | World Breaker, Judgement | 285 | 284 |  | 280 |
 | Deus Ex Machina | 300 | 289 |  | 290 |
 | Chaos | - | 339 |  | 300 |
+
+## Requirements
+
+The [Mod Framework](https://mgqonline.org/mods/mod-framework) is optional. Without it, the mod works the same and its options are in the Mod Config Menu or at the end of the game's Config menu, but MGQ Online's World overview has no Level Cap tab. It comes on its own, not with the Collection or MGQ Online: install it as its page says.
 
 ## Install
 
