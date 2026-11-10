@@ -4,6 +4,7 @@
 #  Changelog:
 #      Paulinchen  2026-11-10: Kept where the story stands until a switch or variable a milestone reads changes, instead of reading it for every level cap asked
 #                            - Left the job change screen alone when the character dialog closes because the scene ended
+#                            - Said in the character dialog why a dimmed arrow cannot buy or refund a slot
 #      Paulinchen  2026-11-09: Showed the Job Points tab as character cards that open a dialog with the tiers and Reset
 #                            - Named the overview tab Level Cap
 #                            - Showed the formation outside the Pocket Castle and every companion with a search inside
@@ -1622,6 +1623,17 @@ if defined?(Mod_Framework::UI::Component) && Mod_Framework::UI.respond_to?(:patc
           return nil
         end
 
+        refused(actor, row, step)
+      end
+
+      # Logs why a slot of a tier cannot change.
+      #
+      # @param actor [Game_Actor] The character.
+      # @param row [Hash] The tier's row, see tier_rows.
+      # @param step [Integer] 1 to buy, -1 to refund.
+      # @return [String] Why the slot cannot change.
+      def self.refused(actor, row, step)
+        kind, tier = row[:data]
         why = refusal(actor, kind, tier, step)
         MGQ_LevelCap.log("#{actor.name}: no #{step > 0 ? 'more' : 'fewer'} slots of #{slot_name(kind, tier)}: #{why}")
         why
@@ -1936,7 +1948,7 @@ if defined?(Mod_Framework::UI::Component) && Mod_Framework::UI.respond_to?(:patc
             list rows, id: TIERS_ID, dense: true, most_rows: rows.size, note_at: TIERS, autofocus: true,
                        on_change: ->(row) { follow(row) }, on_side: ->(row, step) { change_slot(row, step) },
                        on_submit: ->(row) { start_reset(rows) if row[:data] == RESET_ROW },
-                       on_refuse: ->(row) { MGQ_LevelCap.log("#{actor.name}: no reset: #{row[:tooltip]}") }
+                       on_refuse: ->(row, step) { refuse(row, step) }
             text(foot, { :wrap => true, :most_lines => 2 }.merge(said ? { :color => said[1] } : { :color => :dim }))
             key_help entries: DIALOG_KEYS
           end
@@ -1966,6 +1978,17 @@ if defined?(Mod_Framework::UI::Component) && Mod_Framework::UI.respond_to?(:patc
           why = Points.adjust(actor, row, step, place)
           why ? Sound.play_buzzer : Sound.play_cursor
           self.said = why ? [why, :error] : nil
+        end
+
+        # Says why a dim arrow of a tier did not change its slot, or logs why Reset is greyed out;
+        # the list already buzzed.
+        #
+        # @param row [Hash] The row.
+        # @param step [Integer, nil] 1 or -1 for an arrow, nil for a pick of Reset.
+        def refuse(row, step)
+          return MGQ_LevelCap.log("#{actor.name}: no reset: #{row[:tooltip]}") unless step
+
+          self.said = [Points.refused(actor, row, step), :error]
         end
 
         # Asks for the Basic job and race to keep in a menu beside the Reset row, steps with one
