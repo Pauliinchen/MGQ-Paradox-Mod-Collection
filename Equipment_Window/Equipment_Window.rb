@@ -2,6 +2,7 @@
 #  Equipment_Window.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Named Tab in the hotkey help of the slot list while the details show, and confirm on the Gems tab's lines
 #      Paulinchen  2026-11-09: Sized the item list by opener_size, a documented call of the framework
 #                            - Drew a gem's tooltip as before: each effect line wrapped on its own, the name narrowed beside its elements
 #                            - Built every screen from the framework's general parts and its readers of the game's data
@@ -51,7 +52,7 @@ module Equipment_Window
 
   # What the key help says each key does.
   KEY_TEXTS = { change: "Change", character: "Character", next_tab: "Next tab", tabs: "Tabs", close: "Close", back: "Back", search: "Search",
-                list: "Back to the list", filter: "Filter", colors: "Colors" }
+                list: "Back to the list", filter: "Filter", colors: "Colors", gem: "Change gem" }
 
   # The other texts the window shows, by what they say.
   TEXTS = { equipped: "Equipped", remove: "Remove", remove_note: "Leaves the slot empty", selected: "Selected", nothing_selected: "Nothing selected",
@@ -820,7 +821,8 @@ module Equipment_Window
     # Whether the item dialog lists favorites only.
     state :favorites, false
 
-    # The part in focus the key help names keys for: :slots, :optimize, :clear or :details.
+    # The part in focus the key help names keys for: :slots, :optimize, :clear, :details or :back for
+    # the details' Back.
     state :keys_for, :slots
 
     # Whether a gamepad was used last, whose shoulders step the details' tabs while they show.
@@ -924,7 +926,7 @@ module Equipment_Window
     # @param item [RPG::EquipItem] The item.
     def item_tabs(item)
       tabs bind: :details_tab, id: :ew_detail_tabs do
-        tabs_header { button BACK, variant: :text, on_click: :back }
+        tabs_header { button BACK, variant: :text, on_click: :back, on_focus: -> { self.keys_for = :back }, on_blur: -> { self.keys_for = :details } }
         tabs_subheader { type_section(item) }
         tab("Info", id: :ew_info) { info_section(item) }
         tab("Gems #{UI::Equip.gems_text(item)}", id: :ew_gems) { gems_section(item) } if UI::Equip.socketed?(item)
@@ -999,18 +1001,35 @@ module Equipment_Window
       UI::Equip.gems_changeable?(shown, slot) ? text(how, color: :system) : text(FIXED_TEXT, color: :warning)
     end
 
-    # Tells the key help's entries for the part in focus: Change, the shoulders and Close on the
-    # slot list; the button's action, the shoulders and Back on Optimize and Clear; on the details
-    # Next tab while two or more tabs show and no gamepad was used last, the shoulders and Back.
+    # Tells the key help's entries for the part in focus: Change, Next tab, the shoulders and Close on
+    # the slot list; the button's action, the shoulders and Back on Optimize and Clear; on the details
+    # Change gem on the Gems tab's lines, Next tab, the shoulders and Back.
     #
     # @return [Array<Hash>] The entries.
     def key_entries
       back = { button: :B, text: KEY_TEXTS[:back] }
       case keys_for
-      when :slots then [{ button: :C, text: KEY_TEXTS[:change] }, shoulders_entry, { button: :B, text: KEY_TEXTS[:close] }]
+      when :slots then [{ button: :C, text: KEY_TEXTS[:change] }] + (page == 1 ? tab_entries : []) + [shoulders_entry, { button: :B, text: KEY_TEXTS[:close] }]
       when :optimize, :clear then [{ button: :C, text: UI::Game.term(keys_for) }, shoulders_entry, back]
-      else (tabbed? && !UI.pad? ? [{ key: "Tab", text: KEY_TEXTS[:next_tab] }] : []) + [shoulders_entry, back]
+      else gem_entries + tab_entries + [shoulders_entry, back]
       end
+    end
+
+    # Tells Tab's entry while the item has two or more tabs and no gamepad was used last, whose
+    # shoulders step them instead; Tab steps them from the slot list too while the details show.
+    #
+    # @return [Array<Hash>] The entry, or none.
+    def tab_entries
+      tabbed? && !UI.pad? ? [{ key: "Tab", text: KEY_TEXTS[:next_tab] }] : []
+    end
+
+    # Tells confirm's entry on a line of the Gems tab, which opens the gem dialog for that socket,
+    # while the slot's gems can change.
+    #
+    # @return [Array<Hash>] The entry, or none.
+    def gem_entries
+      gems = keys_for == :details && details_tab == :ew_gems && UI::Equip.socketed?(current_item) && UI::Equip.gems_changeable?(shown, slot)
+      gems ? [{ button: :C, text: KEY_TEXTS[:gem] }] : []
     end
 
     # Tells what Q and W or a gamepad's shoulders do: a gamepad's shoulders step the details' tabs

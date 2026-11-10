@@ -6,7 +6,8 @@ Replaces the game's equip screen with a window that shows a character's slots, t
 - Pick a slot, then an item: the stats show what it changes before you equip it.
 - *Optimize* equips the strongest items in every slot that can change, and *Clear* takes off everything in those slots.
 - A search box finds items by name, and *Favorites* shows only the items you marked.
-- An item's details show its gems; a socketed item gets a *Gems* tab to set them.
+- **Right** on a slot slides in the item's details, with its *Info*, *Gems* and *Set* tabs. **Tab** steps the tabs, also while the cursor is on the slots; on a gamepad **L** and **R** do.
+- To set or take out a gem: put the cursor on the item's slot, press **Right** to show the details, **Tab** to the *Gems* tab, then **Right** again onto its sockets. Pick a socket with **Up** and **Down** and press confirm to open the gem list. Pick a gem to set it, or *Remove gem* to take the socket's gem out; a gem taken out goes back to the bag. Cancel closes the list without a change. In the list, the number keys show only the gems of one color and **Tab** goes into the search. With the mouse, click a socket under the item's name.
 - The hotkey help under the window names the keys of the part the cursor is on.
 - Wears the look picked in the Mod Framework's Interface Look, and works with the mouse.
 
