@@ -5,6 +5,7 @@
 #      Paulinchen  2026-11-10: Kept where the story stands until a switch or variable a milestone reads changes, instead of reading it for every level cap asked
 #                            - Left the job change screen alone when the character dialog closes because the scene ended
 #                            - Said in the character dialog why a dimmed arrow cannot buy or refund a slot
+#                            - Took only a step of 1 or -1 as a dimmed arrow, so the dialog keeps working on Mod Framework 0.1.0
 #      Paulinchen  2026-11-09: Showed the Job Points tab as character cards that open a dialog with the tiers and Reset
 #                            - Named the overview tab Level Cap
 #                            - Showed the formation outside the Pocket Castle and every companion with a search inside
@@ -1983,10 +1984,12 @@ if defined?(Mod_Framework::UI::Component) && Mod_Framework::UI.respond_to?(:patc
         # Says why a dim arrow of a tier did not change its slot, or logs why Reset is greyed out;
         # the list already buzzed.
         #
+        # Only 1 and -1 count as an arrow, as Mod Framework 0.1.0 tells a pick without a step.
+        #
         # @param row [Hash] The row.
         # @param step [Integer, nil] 1 or -1 for an arrow, nil for a pick of Reset.
         def refuse(row, step)
-          return MGQ_LevelCap.log("#{actor.name}: no reset: #{row[:tooltip]}") unless step
+          return MGQ_LevelCap.log("#{actor.name}: no reset: #{row[:tooltip]}") unless step == 1 || step == -1
 
           self.said = [Points.refused(actor, row, step), :error]
         end
