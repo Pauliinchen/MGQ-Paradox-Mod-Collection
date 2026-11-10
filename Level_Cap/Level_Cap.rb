@@ -3,6 +3,7 @@
 #
 #  Changelog:
 #      Paulinchen  2026-11-10: Kept where the story stands until a switch or variable a milestone reads changes, instead of reading it for every level cap asked
+#                            - Left the job change screen alone when the character dialog closes because the scene ended
 #      Paulinchen  2026-11-09: Showed the Job Points tab as character cards that open a dialog with the tiers and Reset
 #                            - Named the overview tab Level Cap
 #                            - Showed the formation outside the Pocket Castle and every companion with a search inside
@@ -2035,7 +2036,7 @@ class Scene_JobChange
   end
 
   # Opens the character's dialog of the Mod Framework, the overview's, which returns to the
-  # character list as it closes.
+  # character list as it closes, unless the scene ended.
   #
   # @param actor [Game_Actor] The character.
   # @return [Boolean] Whether it opened; false without the framework or when it did not open.
@@ -2043,7 +2044,10 @@ class Scene_JobChange
     return false unless defined?(MGQ_LevelCap::Points::CharacterDialog)
 
     place = MGQ_LevelCap::JOB_CHANGE_PLACE
-    shown = Mod_Framework::UI.open(MGQ_LevelCap::Points::CharacterDialog, :actor => actor, :place => place) { mgq_level_cap_dialog_closed }
+    shown = Mod_Framework::UI.open(MGQ_LevelCap::Points::CharacterDialog, :actor => actor, :place => place) do |_result, why|
+      # A dialog closed because the scene ended finds the scene's windows already disposed.
+      mgq_level_cap_dialog_closed unless why == :scene
+    end
     MGQ_LevelCap::Points.log_dialog(actor, "opened", place) if shown
     shown ? true : false
   rescue => e
