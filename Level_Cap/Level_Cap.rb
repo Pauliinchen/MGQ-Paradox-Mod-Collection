@@ -2,6 +2,7 @@
 #  Level_Cap.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Worked out the level cap again each frame, so story values another mod writes straight into the game count too
 #      Paulinchen  2026-11-10: Kept where the story stands until a switch or variable a milestone reads changes, instead of reading it for every level cap asked
 #                            - Left the job change screen alone when the character dialog closes because the scene ended
 #                            - Said in the character dialog why a dimmed arrow cannot buy or refund a slot
@@ -191,12 +192,6 @@ module MGQ_LevelCap
     ["Chaos", nil, 339, 5, 5, [[[:s,7039]]]],
   ]
 
-  # The ids of the switches (:s) and variables (:v) the milestones read, each mapped to true.
-  MILESTONE_IDS = { :s => {}, :v => {} }
-  MILESTONES.each do |milestone|
-    milestone[5].each { |conditions| conditions.each { |kind, id| MILESTONE_IDS[kind][id] = true } }
-  end
-
   # Writes a line to the log, at most MAX_LOG_LINES per session.
   #
   # @param message [String] what happened
@@ -229,8 +224,8 @@ module MGQ_LevelCap
   end
 
   # Works out where the story stands: the highest cap, points and open tiers among the beaten
-  # bosses. Kept until a switch or variable a milestone reads is written or the game's switches or
-  # variables are replaced, as a loaded save or another mod does.
+  # bosses. Worked out at most once a frame, whoever wrote the story, and again at once when the
+  # game's switches or variables are replaced, as a loaded save does.
   #
   # Each read of the game's variables walks its shared ranges, and the cap is asked for every
   # character a screen or another mod looks at, many times a second.
@@ -241,18 +236,23 @@ module MGQ_LevelCap
     return nil unless $game_switches && $game_variables
 
     stamp = [$game_switches, $game_variables, $game_switches.instance_variable_get(:@data),
-             $game_variables.instance_variable_get(:@data)].map { |object| object.object_id } << @writes.to_i
-    @progress = [stamp, work_out_progress] unless @progress && @progress[0] == stamp
+             $game_variables.instance_variable_get(:@data)].map { |object| object.object_id } <<
+            Graphics.frame_count
+    unless @progress && @progress[0] == stamp
+      state = work_out_progress
+      log_progress(state) unless @progress && @progress[1] == state
+      @progress = [stamp, state]
+    end
     @progress[1] && @progress[1].dup
   end
 
-  # Counts a write of a switch or variable a milestone reads, after which the progress is worked
-  # out again.
+  # Logs where the story now stands, after the progress changed.
   #
-  # @param kind [Symbol] :s for a switch, :v for a variable
-  # @param id [Integer] the switch or variable written
-  def self.story_written(kind, id)
-    @writes = @writes.to_i + 1 if MILESTONE_IDS[kind][id]
+  # @param state [Array(Integer, Integer, Integer, Integer)] the cap (nil once lifted), the points
+  #   and the highest open job and race tiers
+  def self.log_progress(state)
+    cap = state[0] ? "the level cap #{state[0]}" : "no level cap"
+    log("the story now sets #{cap}, #{state[1]} points, job tier #{state[2]}, race tier #{state[3]}")
   end
 
   # Works out where the story stands from the game's switches and variables, see progress.
@@ -857,17 +857,6 @@ module MGQ_LevelCap
   # lost and the level stops. Never below the current level, or change_exp would level down.
   # Levels the story sets go past the cap: companions lifted to the party's level, Change Level.
   def self.install_level_hooks
-    { Game_Switches => :s, Game_Variables => :v }.each do |owner, kind|
-      owner.class_eval do
-        alias_method :mgq_level_cap_set, :[]=
-        define_method(:[]=) do |id, value|
-          result = mgq_level_cap_set(id, value)
-          MGQ_LevelCap.story_written(kind, id)
-          result
-        end
-      end
-    end
-
     Game_Actor.class_eval do
       alias_method :mgq_level_cap_max_level, :max_level
       def max_level(kind)
