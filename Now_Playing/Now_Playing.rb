@@ -2,6 +2,7 @@
 #  Now_Playing.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Logged each track shown, and each failure once instead of passing over it
 #      Paulinchen  2026-11-07: Drew the box as a HUD of the Mod Framework when it is installed
 #      Paulinchen  2026-09-27: Held the popup back while the screen is dark.
 #      Paulinchen  2026-09-26: Created
@@ -51,6 +52,35 @@ module Now_Playing
   # edge, and the framework's notices are 100.
   ORDER = 50
 
+  # Folder next to Game.exe that holds the logs, shared with the user's other mods.
+  LOG_DIR = "Logs"
+
+  # Log in LOG_DIR of what the mod did and what failed, while the Mod Framework is missing.
+  LOG_FILE = "Now Playing.log"
+
+  # Writes a line into the Mod Framework's log, or into LOG_FILE without the framework.
+  #
+  # @param message [String] what happened
+  def self.log(message)
+    return Mod_Framework.log("Now Playing: #{message}") if defined?(Mod_Framework.log)
+
+    Dir.mkdir(LOG_DIR) unless File.directory?(LOG_DIR)
+    File.open("#{LOG_DIR}/#{LOG_FILE}", "ab") { |file| file.write("#{Time.now}  #{message}\n") }
+  rescue
+  end
+
+  # Logs a failure once per place and error class, since the hooks run every frame.
+  #
+  # @param place [String] what failed
+  # @param error [Exception] the error raised
+  def self.failed(place, error)
+    @failed ||= {}
+    return if @failed[[place, error.class]]
+
+    @failed[[place, error.class]] = true
+    log("#{place} FAILED: #{error.class}: #{error.message}")
+  end
+
   # Track names by BGM file name, read from the music room once.
   #
   # The music room keys its tracks by id, a popup needs them by the file that is played.
@@ -84,7 +114,10 @@ module Now_Playing
 
     @current = key
     title = titles[key]
-    show(PREFIX + title) if title
+    return unless title
+
+    show(PREFIX + title)
+    log("showed #{title} (#{key})")
   end
 
   # Forgets the current track, so playing it again shows it again. Called from the Audio.bgm_stop hook.
@@ -281,14 +314,22 @@ unless Audio.respond_to?(:now_playing_bgm_play)
     alias now_playing_bgm_play bgm_play
     def bgm_play(*args)
       result = now_playing_bgm_play(*args)
-      Now_Playing.played(args[0]) rescue nil
+      begin
+        Now_Playing.played(args[0])
+      rescue => e
+        Now_Playing.failed("played", e)
+      end
       result
     end
 
     alias now_playing_bgm_stop bgm_stop
     def bgm_stop(*args)
       result = now_playing_bgm_stop(*args)
-      Now_Playing.stopped rescue nil
+      begin
+        Now_Playing.stopped
+      rescue => e
+        Now_Playing.failed("stopped", e)
+      end
       result
     end
   end
@@ -298,7 +339,11 @@ unless Audio.respond_to?(:now_playing_bgm_play)
     alias now_playing_update update
     def update
       now_playing_update
-      Now_Playing.update rescue nil
+      begin
+        Now_Playing.update
+      rescue => e
+        Now_Playing.failed("update", e)
+      end
     end
   end
 end

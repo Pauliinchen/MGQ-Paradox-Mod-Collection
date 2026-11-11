@@ -3,6 +3,7 @@
 #
 #  Changelog:
 #      Paulinchen  2026-11-11: Kept the own hotkey quiet while the player types into a text field of the Mod Framework
+#                            - Logged every action, and each failure once instead of stopping after 60 lines
 #      Paulinchen  2026-11-07: Dropped the key binding of Mod Config Remake
 #      Paulinchen  2026-10-31: Made Hotkey a hotkey of the Mod Framework while its DLL works, taking over the key or None of a save once
 #      Paulinchen  2026-10-30: Made Hotkey a key binding only where the Mod Framework's DLL works
@@ -69,11 +70,8 @@ module MGQ_PartySheet
   # Folder next to Game.exe that holds the logs, shared with the user's other mods.
   LOG_DIR = "Logs"
 
-  # Log in LOG_DIR, which only appears when something went wrong.
+  # Log in LOG_DIR of what the mod did and what failed.
   LOG_FILE = "Party Sheet.log"
-
-  # Lines logged per session at most, a part missing from the game would be logged at every write.
-  MAX_LOG_LINES = 60
 
   # Reports whether the hooks can be installed.
   #
@@ -109,7 +107,11 @@ module MGQ_PartySheet
     File.open(page_file, "wb") { |file| file.write(page) } if page
     File.open(upload_file, "wb") { |file| file.write(Page.build(true)) } if upload
     shots = Options.image? ? [[Page.frontline(Browser.base), sheet(IMAGE_FILE)]] : []
-    Browser.run(page, page_file, shots, upload ? [upload_file, sheet(FILE), sheet(LINK_FILE)] : nil)
+    started = Browser.run(page, page_file, shots, upload ? [upload_file, sheet(FILE), sheet(LINK_FILE)] : nil)
+    done = page ? ["page"] : []
+    done << "image started" if started && !shots.empty?
+    done << "upload started" if started && upload
+    log("wrote the party sheet of save #{Slot.name}: #{done.empty? ? 'nothing' : done.join(', ')}")
     Sound.play_save
   rescue => e
     log("could not write the party sheet: #{e.class}: #{e.message}")
@@ -134,6 +136,7 @@ module MGQ_PartySheet
       upload = [upload_image, image, sheet("#{name}.url")]
     end
     started = Browser.run(nil, nil, shots, upload)
+    log("started the image of #{actor.name} (actor #{actor.id})#{upload ? ' and its upload' : ''}") if started
     started ? Sound.play_save : Sound.play_buzzer
   rescue => e
     log("could not write the sheet of #{actor.name}: #{e.class}: #{e.message}")
@@ -157,7 +160,7 @@ module MGQ_PartySheet
 
     write_here
   rescue => e
-    log("hotkey check failed: #{e.class}: #{e.message}")
+    failed("hotkey check", e)
   end
 
   # Writes the image of the member the status screen shows, else the sheet, as the hotkey does.
@@ -174,7 +177,7 @@ module MGQ_PartySheet
   def self.safely(part)
     yield
   rescue => e
-    log("#{part} left out: #{e.class}: #{e.message}")
+    failed("#{part} on the page", e)
     ""
   end
 
@@ -217,11 +220,21 @@ module MGQ_PartySheet
   #
   # @param message [String] the line to append
   def self.log(message)
-    @log_lines = (@log_lines || 0) + 1
-    return if @log_lines > MAX_LOG_LINES
-
     File.open(log_file, "ab") { |file| file.write("#{Time.now}  #{message}\n") }
   rescue
+  end
+
+  # Logs a failure once per place and error class, since a part missing from the game fails at
+  # every write and the hotkey check at every frame.
+  #
+  # @param place [String] what failed
+  # @param error [Exception] the error raised
+  def self.failed(place, error)
+    @failed ||= {}
+    return if @failed[[place, error.class]]
+
+    @failed[[place, error.class]] = true
+    log("#{place} FAILED: #{error.class}: #{error.message}")
   end
 
   # Builds the full path of LOG_FILE in LOG_DIR, and makes the folder when it is missing.
@@ -330,7 +343,7 @@ module MGQ_PartySheet
       MGQ_PartySheet.log("the Mod Framework refused the hotkey, it stays an option of the save") unless @framework
       @framework
     rescue => e
-      MGQ_PartySheet.log("hotkey through the Mod Framework FAILED: #{e.class}: #{e.message}")
+      MGQ_PartySheet.failed("hotkey through the Mod Framework", e)
       @framework = false
     end
 
@@ -378,7 +391,7 @@ module MGQ_PartySheet
         MGQ_PartySheet.log("this save had no hotkey, so the hotkey is off until a key is bound in Options > Mods")
       end
     rescue => e
-      MGQ_PartySheet.log("taking over the hotkey of this save FAILED: #{e.class}: #{e.message}")
+      MGQ_PartySheet.failed("taking over the hotkey of this save", e)
     end
   end
 
@@ -895,7 +908,7 @@ module MGQ_PartySheet
       lists = begin
                 StatusScreen.lists(actor)
               rescue => e
-                MGQ_PartySheet.log("status screen of #{actor.name} not read: #{e.class}: #{e.message}")
+                MGQ_PartySheet.failed("status screen of #{actor.name}", e)
                 nil
               end
       return lists if lists && !lists.empty?
@@ -1913,6 +1926,7 @@ if ($Upload) {
     if ($url -notmatch '^https://[^\s]+$') { throw "the site answered no address: $body" }
     [IO.File]::WriteAllText($LinkFile, "[InternetShortcut]`r`nURL=$url`r`n", [Text.Encoding]::ASCII)
     Set-Clipboard -Value $url
+    Add-Content -LiteralPath $Log -Value "$(Get-Date)  uploaded $UploadName for 7 days"
   } catch {
     Add-Content -LiteralPath $Log -Value "$(Get-Date)  upload of $UploadName failed: $_"
   }
@@ -2709,7 +2723,7 @@ body{margin:0;background:var(--bg)}
     def self.palette
       Options.light? ? LIGHT : DARK
     rescue => e
-      MGQ_PartySheet.log("theme left dark: #{e.class}: #{e.message}")
+      MGQ_PartySheet.failed("theme", e)
       DARK
     end
 
@@ -3073,7 +3087,7 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
   begin
     MGQ_PartySheet::Options.register
   rescue => e
-    MGQ_PartySheet.log("options FAILED: #{e.class}: #{e.message}")
+    MGQ_PartySheet.failed("options", e)
   end
 
   # Every scene runs update_basic once per frame, in every menu and on the map.
@@ -3087,7 +3101,7 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
       end
     end
   rescue => e
-    MGQ_PartySheet.log("hotkey hook FAILED: #{e.class}: #{e.message}")
+    MGQ_PartySheet.failed("hotkey hook", e)
   end
 
   # Saving to a slot, loading any save and a new game go through these, autosaving does not.
@@ -3116,7 +3130,7 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
       end
     end
   rescue => e
-    MGQ_PartySheet.log("save slot hooks FAILED: #{e.class}: #{e.message}")
+    MGQ_PartySheet.failed("save slot hooks", e)
   end
 
   # The config windows draw every option again after each change, so Shown Theme comes and goes
@@ -3136,7 +3150,7 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
       end
     end
   rescue => e
-    MGQ_PartySheet.log("config window hooks FAILED: #{e.class}: #{e.message}")
+    MGQ_PartySheet.failed("config window hooks", e)
   end
 
   # The config windows call the handler of an entry's key when it is chosen, and stay active.
@@ -3152,6 +3166,6 @@ if MGQ_PartySheet::ENABLED && MGQ_PartySheet.hookable?
       end
     end
   rescue => e
-    MGQ_PartySheet.log("config hook FAILED: #{e.class}: #{e.message}")
+    MGQ_PartySheet.failed("config hook", e)
   end
 end

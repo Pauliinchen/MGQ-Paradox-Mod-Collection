@@ -2,6 +2,7 @@
 #  Battle_Dialogue.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Logged each failure once into the Mod Framework's log instead of passing over it
 #      Paulinchen  2026-11-09: Let the strip give up its side room at half the screen as before
 #                            - Took fading lines off at once at the battle's end and gave the strip's text its old width
 #                            - Drew the battle lines through the Mod Framework, which it now needs
@@ -43,6 +44,20 @@ if defined?(Mod_Framework::UI.column)
   module Battle_Dialogue
     # Short name for the framework's UI module.
     UI = Mod_Framework::UI
+
+    # Logs a failure into the Mod Framework's log once per place and error class, since most places
+    # run every frame.
+    #
+    # @param place [String] What failed.
+    # @param error [Exception] The error raised.
+    def self.failed(place, error)
+      @failed ||= {}
+      return if @failed[[place, error.class]]
+
+      @failed[[place, error.class]] = true
+      Mod_Framework.log("Battle Dialogue: #{place} FAILED: #{error.class}: #{error.message}")
+    rescue
+    end
 
     # Turns the boxes off without uninstalling them.
     ENABLED = true
@@ -253,7 +268,8 @@ if defined?(Mod_Framework::UI.column)
       show(message.face_name, message.face_index, message.texts.dup, face_hue, speaker_of(message))
       message.clear
       true
-    rescue
+    rescue => e
+      failed("taking a message", e)
       false
     end
 
@@ -364,7 +380,8 @@ if defined?(Mod_Framework::UI.column)
     def self.clear
       all_boxes.flatten.each { |line| line.handle.hide(at_once: true) }
       @boxes = nil
-    rescue
+    rescue => e
+      failed("clearing the boxes", e)
     end
 
     # Tells the lines whose boxes show at a place, those fading out too, which still hold their place
@@ -437,7 +454,8 @@ if defined?(Mod_Framework::UI.column)
           battle_dialogue_terminate
         end
       end
-    rescue
+    rescue => e
+      failed("install", e)
     end
   end
 
@@ -450,7 +468,8 @@ if defined?(Mod_Framework::UI.column)
           battle_dialogue_run
         end
       end
-    rescue
+    rescue => e
+      Battle_Dialogue.failed("SceneManager hook", e)
     end
   end
 else

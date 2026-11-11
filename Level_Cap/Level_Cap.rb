@@ -3,6 +3,7 @@
 #
 #  Changelog:
 #      Paulinchen  2026-11-11: Worked out the level cap again each frame, so story values another mod writes straight into the game count too
+#                            - Logged each failure once instead of stopping after 40 lines
 #      Paulinchen  2026-11-10: Kept where the story stands until a switch or variable a milestone reads changes, instead of reading it for every level cap asked
 #                            - Left the job change screen alone when the character dialog closes because the scene ended
 #                            - Said in the character dialog why a dimmed arrow cannot buy or refund a slot
@@ -41,11 +42,8 @@ module MGQ_LevelCap
   # Folder next to Game.exe that holds the logs, shared with the user's other mods.
   LOG_DIR = "Logs"
 
-  # Log in LOG_DIR, which only appears when something went wrong.
+  # Log in LOG_DIR of what the mod did and what failed.
   LOG_FILE = "Level Cap.log"
-
-  # Lines logged per session at most.
-  MAX_LOG_LINES = 40
 
   # Option that turns the level cap on or off, its key in $game_system.conf.
   CAP_OPTION = :mod_level_cap
@@ -192,16 +190,26 @@ module MGQ_LevelCap
     ["Chaos", nil, 339, 5, 5, [[[:s,7039]]]],
   ]
 
-  # Writes a line to the log, at most MAX_LOG_LINES per session.
+  # Writes a line to the log.
   #
   # @param message [String] what happened
   def self.log(message)
-    @log_lines = (@log_lines || 0) + 1
-    return if @log_lines > MAX_LOG_LINES
-
     Dir.mkdir(LOG_DIR) unless File.directory?(LOG_DIR)
     File.open("#{LOG_DIR}/#{LOG_FILE}", "ab") { |file| file.write("#{Time.now}  #{message}\n") }
   rescue
+  end
+
+  # Logs a failure once per place and error class, since most places fail again on every frame or
+  # read.
+  #
+  # @param place [String] what failed
+  # @param error [Exception] the error raised
+  def self.failed(place, error)
+    @failed ||= {}
+    return if @failed[[place, error.class]]
+
+    @failed[[place, error.class]] = true
+    log("#{place} FAILED: #{error.class}: #{error.message}")
   end
 
   # Reads one of the mod's options; both are on until the player turns them off.
@@ -761,7 +769,7 @@ module MGQ_LevelCap
       remember_mastery(actor)
     end
   rescue => e
-    log("convert_party FAILED: #{e.class}: #{e.message}")
+    failed("convert_party", e)
   end
 
   # Tells whether a character may switch to a job or race. One counted already (level 2 or more)
@@ -850,7 +858,7 @@ module MGQ_LevelCap
     install_point_hooks
     install_window_hooks
   rescue => e
-    log("install FAILED: #{e.class}: #{e.message}")
+    failed("install", e)
   end
 
   # The base level's maximum feeds change_exp, which clamps the EXP to it: EXP past the cap is
@@ -866,7 +874,7 @@ module MGQ_LevelCap
         cap = MGQ_LevelCap.cap
         cap ? [[cap, base_level].max, maximum].min : maximum
       rescue => e
-        MGQ_LevelCap.log("max_level FAILED: #{e.class}: #{e.message}")
+        MGQ_LevelCap.failed("max_level", e)
         mgq_level_cap_max_level(kind)
       end
     end
@@ -893,7 +901,7 @@ module MGQ_LevelCap
       def class_change_enable?(id)
         mgq_level_cap_class_change_enable?(id) && MGQ_LevelCap.allowed?(actor, id)
       rescue => e
-        MGQ_LevelCap.log("class_change_enable? FAILED: #{e.class}: #{e.message}")
+        MGQ_LevelCap.failed("class_change_enable?", e)
         mgq_level_cap_class_change_enable?(id)
       end
     end
@@ -985,7 +993,7 @@ module MGQ_LevelCap
           MGQ_LevelCap.auto_master(actor, class_id)
           @result_popup_window.refresh
         rescue => e
-          MGQ_LevelCap.log("auto_master FAILED: #{e.class}: #{e.message}")
+          MGQ_LevelCap.failed("auto_master", e)
         end
       end
     end
@@ -1068,7 +1076,7 @@ class Foo::JobChange::Window_ClassStatus
               "#{mgq_level_cap_full_text(full)}: #{full[2]} of #{full[3]} slots taken.")
     change_color(normal_color)
   rescue => e
-    MGQ_LevelCap.log("full tier note FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("full tier note", e)
   end
 
   # Draws the same note shorter on a page title of the translation's paged job details, left of
@@ -1091,7 +1099,7 @@ class Foo::JobChange::Window_ClassStatus
     draw_text(right - width, 1, width + 2, line_height, text)
     change_color(normal_color)
   rescue => e
-    MGQ_LevelCap.log("full tier title FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("full tier title", e)
   ensure
     contents.font.bold = bold unless bold.nil?
     contents.font.size = size if size
@@ -1136,7 +1144,7 @@ class Foo::JobChange::Window_ClassType
 
     [state[0][tier - 1], state[1][tier - 1]]
   rescue => e
-    MGQ_LevelCap.log("tier count FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("tier count", e)
     nil
   end
 
@@ -1159,7 +1167,7 @@ class Foo::JobChange::Window_ClassType
     @mgq_level_cap_shown = shown
     refresh
   rescue => e
-    MGQ_LevelCap.log("tier tab refresh FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("tier tab refresh", e)
   end
 
   # @param count [Integer] the jobs or races taken in a tier
@@ -1194,7 +1202,7 @@ class Foo::JobChange::Window_ClassType
     draw_text(number_x, rect.y, number_width + 2, rect.height, number)
     true
   rescue => e
-    MGQ_LevelCap.log("tier tab FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("tier tab", e)
     false
   end
 end
@@ -1236,7 +1244,7 @@ module MGQ_LevelCap
       change_color(normal_color, false)
       draw_text(0, line_height, contents_width, line_height, "←/→ Remove or add a slot")
     rescue => e
-      MGQ_LevelCap.log("points window FAILED: #{e.class}: #{e.message}")
+      MGQ_LevelCap.failed("points window", e)
     end
   end
 
@@ -1291,7 +1299,7 @@ module MGQ_LevelCap
       draw_text(rect.x + 265, rect.y, 105, rect.height, open ? "#{PRICES[kind][tier - 1]} pts" : "Opens later")
       draw_text(rect.x + 370, rect.y, rect.width - 370, rect.height, "#{mastered} mastered", 2) if mastered > 0
     rescue => e
-      MGQ_LevelCap.log("slot row FAILED: #{e.class}: #{e.message}")
+      MGQ_LevelCap.failed("slot row", e)
     end
 
     # @param count [Integer] the jobs or races taken in the tier
@@ -1878,7 +1886,7 @@ if defined?(Mod_Framework::UI::Component) && Mod_Framework::UI.respond_to?(:patc
         def unmounted
           log_search
         rescue => e
-          MGQ_LevelCap.log("search log FAILED: #{e.class}: #{e.message}")
+          MGQ_LevelCap.failed("search log", e)
         end
 
         # Turns the pages of cards, round at the ends. The focus keeps its place on the cards, or
@@ -2028,7 +2036,7 @@ class Scene_JobChange
     @popup_window.set_handler(:mgq_level_cap_allocate, method(:mgq_level_cap_open_slots))
     @popup_window.set_handler(:mgq_level_cap_reset, method(:mgq_level_cap_start_reset))
   rescue => e
-    MGQ_LevelCap.log("allocation windows FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("allocation windows", e)
   end
 
   # @return [Game_Actor] the character picked in the character list
@@ -2066,7 +2074,7 @@ class Scene_JobChange
     MGQ_LevelCap::Points.log_dialog(actor, "opened", place) if shown
     shown ? true : false
   rescue => e
-    MGQ_LevelCap.log("character dialog FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("character dialog", e)
     false
   end
 
@@ -2076,7 +2084,7 @@ class Scene_JobChange
     @class_name_window.actor_id = -1
     mgq_level_cap_back_to_actors
   rescue => e
-    MGQ_LevelCap.log("character dialog close FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("character dialog close", e)
   end
 
   # Redraws the points after a slot was bought or refunded.
@@ -2150,7 +2158,7 @@ class Scene_JobChange
       mgq_level_cap_open_slots
     end
   rescue => e
-    MGQ_LevelCap.log("reset FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("reset", e)
     mgq_level_cap_back_to_actors
   end
 end
@@ -2244,7 +2252,7 @@ class Window_Base
     mgq_level_cap_draw_text(maximum_x, maximum_y, maximum_width + 2, height, maximum_text)
     true
   rescue => e
-    MGQ_LevelCap.log("level with maximum FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("level with maximum", e)
     false
   ensure
     contents.font.size = size if size
@@ -2273,7 +2281,7 @@ class Window_Base
     contents.font.color = color.clone
     mgq_level_cap_draw_text(text_x, text_y, room, height, text, align)
   rescue => e
-    MGQ_LevelCap.log("name squeeze FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("name squeeze", e)
   ensure
     contents.font.size = font_size if font_size
     contents.font.color = font_color if font_color
@@ -2292,7 +2300,7 @@ class Window_Base
     font = contents.font
     texts << [x, y, width, height, text, align, font.size, font.color.clone]
   rescue => e
-    MGQ_LevelCap.log("text memory FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("text memory", e)
   end
 
   # Puts the base level and the cap in place of its "COMPLETE" in the status screen's NEXT
@@ -2307,7 +2315,7 @@ class Window_Base
 
     args[index] = text.sub("COMPLETE", "#{@mgq_level_cap_actor.base_level}/#{MGQ_LevelCap.cap}")
   rescue => e
-    MGQ_LevelCap.log("cap mark FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("cap mark", e)
   end
 end
 
@@ -2315,13 +2323,13 @@ if MGQ_LevelCap::ENABLED && !SceneManager.respond_to?(:mgq_level_cap_run)
   begin
     MGQ_LevelCap::Options.register
   rescue => e
-    MGQ_LevelCap.log("options FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("options", e)
   end
 
   begin
     MGQ_LevelCap::Points.patch_overview if defined?(MGQ_LevelCap::Points)
   rescue => e
-    MGQ_LevelCap.log("overview page FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("overview page", e)
   end
 
   begin
@@ -2335,6 +2343,6 @@ if MGQ_LevelCap::ENABLED && !SceneManager.respond_to?(:mgq_level_cap_run)
       end
     end
   rescue => e
-    MGQ_LevelCap.log("scene hook FAILED: #{e.class}: #{e.message}")
+    MGQ_LevelCap.failed("scene hook", e)
   end
 end

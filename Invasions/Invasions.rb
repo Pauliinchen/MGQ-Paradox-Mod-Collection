@@ -2,6 +2,7 @@
 #  Invasions.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Logged every action, and each failure once instead of stopping after 40 lines
 #      Paulinchen  2026-10-09: Created
 #
 #----------------------------------------------------------------
@@ -19,11 +20,8 @@ module MGQ_Invasions
   # Folder next to Game.exe that holds the logs, shared with the user's other mods.
   LOG_DIR = "Logs"
 
-  # Log in LOG_DIR, which only appears when something went wrong.
+  # Log in LOG_DIR of what the mod did and what failed.
   LOG_FILE = "Invasions.log"
-
-  # Lines logged per session at most.
-  MAX_LOG_LINES = 40
 
   # Option that sets the chance of an invasion each turn, its key in $game_system.conf.
   CHANCE_OPTION = :mod_invasions_chance
@@ -85,16 +83,26 @@ module MGQ_Invasions
   # What the party is told when it tries to flee while invaders stand.
   SURROUNDED_TEXT = "You cannot flee as long as you are surrounded!"
 
-  # Writes a line to the log, at most MAX_LOG_LINES per session.
+  # Writes a line to the log.
   #
   # @param message [String] What happened.
   def self.log(message)
-    @log_lines = (@log_lines || 0) + 1
-    return if @log_lines > MAX_LOG_LINES
-
     Dir.mkdir(LOG_DIR) unless File.directory?(LOG_DIR)
     File.open("#{LOG_DIR}/#{LOG_FILE}", "ab") { |file| file.write("#{Time.now}  #{message}\n") }
   rescue
+  end
+
+  # Logs a failure once per place and error class, since most places fail again on every frame or
+  # turn.
+  #
+  # @param place [String] What failed.
+  # @param error [Exception] The error raised.
+  def self.failed(place, error)
+    @failed ||= {}
+    return if @failed[[place, error.class]]
+
+    @failed[[place, error.class]] = true
+    log("#{place} FAILED: #{error.class}: #{error.message}")
   end
 
   # Reads one of the mod's options.
@@ -149,7 +157,7 @@ module MGQ_Invasions
     troop_id = pick(map_id)
     troop.mgq_invasions_pending = troop_id if invaders(troop_id).any? && !behind_wide?(troop_id)
   rescue => e
-    log("roll FAILED: #{e.class}: #{e.message}")
+    failed("roll", e)
   end
 
   # Finds the map whose encounter list the running battle's invaders come from: this map for a
@@ -280,7 +288,7 @@ module MGQ_Invasions
     @encounter_lists[map_id] ||= begin
       load_data(DataManager.map_file_name(map_id)).encounter_list
     rescue => e
-      log("map #{map_id} FAILED: #{e.class}: #{e.message}")
+      failed("map #{map_id}", e)
       []
     end
   end
@@ -335,9 +343,11 @@ module MGQ_Invasions
     join(scene, enemies)
     troop.mgq_invasions_count += 1
     troop.mgq_invasions_added += enemies.size
+    names = enemies.map { |enemy| "#{enemy.enemy_id} #{enemy.name}" }.join(", ")
+    log("invasion #{troop.mgq_invasions_count}: troop #{troop_id} joined with #{names}")
   rescue => e
     troop.mgq_invasions_pending = nil if troop
-    log("spawn FAILED: #{e.class}: #{e.message}")
+    failed("spawn", e)
   end
 
   # Tells whether the command phase opens after a turn of a battle still running.
@@ -608,7 +618,7 @@ module MGQ_Invasions
     joined.each { |enemy| enemy.mgq_invader = true }
     Warning.show(false)
   rescue => e
-    log("watch FAILED: #{e.class}: #{e.message}")
+    failed("watch", e)
   end
 
   # Forgets the enemies watch saw, as a new battle sets its troop up.
@@ -620,10 +630,15 @@ module MGQ_Invasions
   #
   # @return [Boolean] Whether any invader is alive and shown.
   def self.surrounded?
-    $game_troop.members.any? { |enemy| enemy.is_a?(Game_Enemy) && enemy.mgq_invader? && enemy.exist? }
+    invaders_standing > 0
   rescue => e
-    log("surrounded FAILED: #{e.class}: #{e.message}")
+    failed("surrounded", e)
     false
+  end
+
+  # @return [Integer] How many invaders are alive and shown.
+  def self.invaders_standing
+    $game_troop.members.count { |enemy| enemy.is_a?(Game_Enemy) && enemy.mgq_invader? && enemy.exist? }
   end
 
   # Turns the party's Escape command down while invaders stand: tells why and opens the party's
@@ -631,6 +646,7 @@ module MGQ_Invasions
   #
   # @param scene [Scene_Battle] The battle.
   def self.refuse_escape(scene)
+    log("refused the party's escape (command): #{invaders_standing} invaders stand")
     Sound.play_buzzer
     $game_message.add(SURROUNDED_TEXT)
     scene.send(:wait_for_message)
@@ -639,6 +655,7 @@ module MGQ_Invasions
 
   # Turns an escape skill or item of the party down while invaders stand, telling why.
   def self.refuse_forced_escape
+    log("refused the party's escape (skill or item): #{invaders_standing} invaders stand")
     $game_message.add(SURROUNDED_TEXT)
     BattleManager.wait_for_message
   end
@@ -664,7 +681,7 @@ module MGQ_Invasions
     library = $game_library.enemy
     library.set_discovery(enemies.map(&:id)) if library.respond_to?(:set_discovery)
   rescue => e
-    log("library FAILED: #{e.class}: #{e.message}")
+    failed("library", e)
   end
 
   # Builds the enemies' sprites anew, which creates those of the invaders while they are hidden so
@@ -745,7 +762,7 @@ module MGQ_Invasions
       update_sprites
       alarm if sound
     rescue => e
-      MGQ_Invasions.log("warning FAILED: #{e.class}: #{e.message}")
+      MGQ_Invasions.failed("warning", e)
       dispose
     end
 
@@ -765,7 +782,7 @@ module MGQ_Invasions
 
       update_sprites
     rescue => e
-      MGQ_Invasions.log("warning update FAILED: #{e.class}: #{e.message}")
+      MGQ_Invasions.failed("warning update", e)
       dispose
     end
 
@@ -788,7 +805,7 @@ module MGQ_Invasions
     def self.alarm
       RPG::SE.new(ALARM_SE, ALARM_VOLUME, 100).play
     rescue => e
-      MGQ_Invasions.log("alarm FAILED: #{e.class}: #{e.message}")
+      MGQ_Invasions.failed("alarm", e)
     end
 
     # Makes the warning's sprites, the box closed.
@@ -1006,7 +1023,7 @@ module MGQ_Invasions
     install_troop_hooks
     install_battle_hooks
   rescue => e
-    log("install FAILED: #{e.class}: #{e.message}")
+    failed("install", e)
   end
 
   # A new battle or a retry clears the troop, and with it the invasion picked and the invasions
@@ -1067,7 +1084,7 @@ module MGQ_Invasions
         begin
           MGQ_Invasions.refuse_escape(self)
         rescue => e
-          MGQ_Invasions.log("refusing to flee FAILED: #{e.class}: #{e.message}")
+          MGQ_Invasions.failed("refusing to flee", e)
           mgq_invasions_command_escape
         end
       end
@@ -1089,7 +1106,7 @@ module MGQ_Invasions
         begin
           MGQ_Invasions.refuse_forced_escape
         rescue => e
-          MGQ_Invasions.log("refusing to flee FAILED: #{e.class}: #{e.message}")
+          MGQ_Invasions.failed("refusing to flee", e)
           mgq_invasions_process_forced_escape
         end
       end
@@ -1491,7 +1508,7 @@ if MGQ_Invasions::ENABLED && !SceneManager.respond_to?(:mgq_invasions_run)
   begin
     MGQ_Invasions::Options.register
   rescue => e
-    MGQ_Invasions.log("options FAILED: #{e.class}: #{e.message}")
+    MGQ_Invasions.failed("options", e)
   end
 
   begin
@@ -1505,6 +1522,6 @@ if MGQ_Invasions::ENABLED && !SceneManager.respond_to?(:mgq_invasions_run)
       end
     end
   rescue => e
-    MGQ_Invasions.log("scene hook FAILED: #{e.class}: #{e.message}")
+    MGQ_Invasions.failed("scene hook", e)
   end
 end
