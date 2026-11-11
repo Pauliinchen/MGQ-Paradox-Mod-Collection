@@ -13,7 +13,7 @@ Replaces the game's equip screen with a window that shows a character's slots, t
 
 ## Requirements
 
-**Equipment Window requires the [Mod Framework](https://mgqonline.org/mods/mod-framework).** It comes on its own, not with the Collection or MGQ Online: install it as its page says. The framework's zip brings a first copy of the Equipment Window, so it is often installed already.
+**Equipment Window requires the [Mod Framework](https://mgqonline.org/mods/mod-framework).** It comes on its own, not with the Collection or MGQ Online: install it as its page says. The framework's zip brings a first copy of the Equipment Window, so it is often installed already. It needs the Mod Framework 0.1.1 or newer; on an older one the menu's Equip keeps opening the game's screen.
 
 ## Install
 

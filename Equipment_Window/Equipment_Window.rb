@@ -2,6 +2,8 @@
 #  Equipment_Window.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Took a socket's pick through on_submit, the framework's one name for taking a choice
+#                            - Kept the game's equip screen on a Mod Framework older than 0.1.1
 #      Paulinchen  2026-11-10: Named Tab in the hotkey help of the slot list while the details show, and confirm on the Gems tab's lines
 #      Paulinchen  2026-11-09: Sized the item list by opener_size, a documented call of the framework
 #                            - Drew a gem's tooltip as before: each effect line wrapped on its own, the name narrowed beside its elements
@@ -889,7 +891,7 @@ module Equipment_Window
         item_head(item, subtitle, subtitle_color: look, empty: NOTHING_TEXT, note: -> { details_link }, on_click: (:forward if item))
         if UI::Equip.socketed?(item)
           slot_row socket_slots(UI::Equip.sockets(item)), id: :ew_summary_gems, empty_icon: UI::Game.empty_socket_icon, empty_tooltip: TEXTS[:empty_socket],
-                                                         note: -> { gem_note(CLICK_TEXT) }, on_pick: ->(socket) { pick_socket(socket, :ew_summary_gems) }
+                                                         note: -> { gem_note(CLICK_TEXT) }, on_submit: ->(socket) { pick_socket(socket, :ew_summary_gems) }
         end
         summary(item) if item
       end
@@ -977,7 +979,7 @@ module Equipment_Window
       end
       stack spacing: 1 do
         lines socket_lines, id: :ew_tab_gems, gutter: SOCKET_GUTTER, escapes: true, note: -> { gem_note(CONFIRM_TEXT) },
-                            on_pick: ->(socket) { pick_socket(socket, :ew_tab_gems) }, grow: 1
+                            on_submit: ->(socket) { pick_socket(socket, :ew_tab_gems) }, grow: 1
       end
     end
 
@@ -1092,6 +1094,15 @@ module Equipment_Window
                              "Which screen the menu's Equip opens.",
                              { 1 => "Equipment Window", 0 => "Game's Screen" }, 1)
 
-  UI.replace_scene Scene_Equip, EquipWindow, if: -> { Mod_Framework::Options.value(:equipment_window_screen) != 0 },
-                                             params: ->(_scene) { { actor: $game_party.menu_actor } }
+  # The oldest framework whose names the window uses.
+  FRAMEWORK_NEEDED = "0.1.1"
+
+  # The framework only warns about a mod that needs a newer one, so on an older framework the
+  # window keeps the game's equip screen instead of failing as a gem slot draws.
+  if Mod_Framework.at_least?(FRAMEWORK_NEEDED)
+    UI.replace_scene Scene_Equip, EquipWindow, if: -> { Mod_Framework::Options.value(:equipment_window_screen) != 0 },
+                                               params: ->(_scene) { { actor: $game_party.menu_actor } }
+  else
+    log("the Mod Framework is older than #{FRAMEWORK_NEEDED}; the game's equip screen stays")
+  end
 end
