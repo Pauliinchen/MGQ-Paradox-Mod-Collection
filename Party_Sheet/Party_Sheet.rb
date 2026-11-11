@@ -2,6 +2,7 @@
 #  Party_Sheet.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Kept the own hotkey quiet while the player types into a text field of the Mod Framework
 #      Paulinchen  2026-11-07: Dropped the key binding of Mod Config Remake
 #      Paulinchen  2026-10-31: Made Hotkey a hotkey of the Mod Framework while its DLL works, taking over the key or None of a save once
 #      Paulinchen  2026-10-30: Made Hotkey a key binding only where the Mod Framework's DLL works
@@ -387,11 +388,10 @@ module MGQ_PartySheet
     DOWN = 0x8000
 
     # Reports whether a key went down since the last call for it, while the game's window is in
-    # front and no mod takes typed text.
+    # front and the player types into no text field of the Mod Framework.
     #
     # Windows reports the key whichever window has the focus, so a press in another window is
-    # ignored. A mod that takes typed text, such as a chat, sets $mgq_text_input meanwhile, so a
-    # typed letter writes no sheet.
+    # ignored, and a letter typed into a text field writes no sheet.
     #
     # @param code [Integer] the key's Windows code, 0 for none
     # @return [Boolean] whether the key went down
@@ -402,7 +402,7 @@ module MGQ_PartySheet
       down = (api('user32', 'GetAsyncKeyState', 'i', 'i').call(code) & DOWN) != 0
       pressed = down && !@down[code]
       @down[code] = down
-      pressed && !$mgq_text_input && game_in_front?
+      pressed && !(defined?(Mod_Framework::UI.typing?) && Mod_Framework::UI.typing?) && game_in_front?
     end
 
     # Keys whose name Windows only gives with the extended flag, as it names the number pad's
